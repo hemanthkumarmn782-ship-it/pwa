@@ -166,7 +166,7 @@
       }
 
       try {
-        const existingUsersRes = await fetch(`${backendUrl}/all`);
+        const existingUsersRes = await fetch(`${backendUrl}/api/users/all`);
         const existingUsers = await existingUsersRes.json();
         const userExists = existingUsers.some(u => u.email === user.email);
 
@@ -176,7 +176,7 @@
           return;
         }
 
-        const res = await fetch(`${backendUrl}/add`, {
+        const res = await fetch(`${backendUrl}/api/users/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(user)
