@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Start Workout — AI Workout Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f1440;--card:rgba(255,255,255,0.03);--muted:rgba(255,255,255,0.75)}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:'Inter',sans-serif;background:linear-gradient(180deg,var(--bg),#241647);color:#f8fafc;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:18px}
+    .card{width:100%;max-width:920px;background:var(--card);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px}
+    .header{display:flex;justify-content:space-between;align-items:center}
+    .title{font-weight:800;font-size:1.05rem}
+    .sub{color:var(--muted);font-size:0.9rem}
+    .main{display:flex;flex-direction:column;align-items:center;gap:12px}
+    /* GIF area: fixed 16:9 box (Option B) */
+    .media{width:100%;max-width:720px;height:405px;background:#000;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:12px}
+    .gif-box{width:600px;height:337px;background:#000;border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .gif-box img{width:100%;height:100%;object-fit:contain;display:block}
+    .exname{font-size:1.6rem;font-weight:800;margin-top:6px;text-align:center}
+    .meta{color:var(--muted);font-size:0.95rem;text-align:center}
+    .controls{display:flex;gap:12px;justify-content:center;margin-top:6px}
+    .btn{padding:10px 14px;border-radius:10px;border:0;font-weight:800;cursor:pointer}
+    .btn.primary{background:linear-gradient(90deg,#60a5fa,#a78bfa);color:#041026}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.08);color:var(--muted)}
+    .footer{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:0.95rem}
+    .overlay-rest{display:none;position:fixed;inset:0;background:rgba(3,7,18,0.92);z-index:9999;align-items:center;justify-content:center;color:#fff}
+    .overlay-rest .box{width:100%;max-width:420px;text-align:center}
+    .small{color:var(--muted);font-size:0.9rem}
+    .top-controls{display:flex;gap:8px;align-items:center}
+    .toggle{
+  padding:8px 14px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:700;
+  background:linear-gradient(90deg,#475569,#64748b);
+  border:1px solid rgba(255,255,255,0.12);
+  color:white;
+  transition:0.2s;
+}
+
+.toggle:hover{
+  background:linear-gradient(90deg,#64748b,#94a3b8);
+  transform:translateY(-2px);
+}
+    @media(max-width:760px){ .gif-box{width:86vw;height:48vw} .media{height:auto} }
+  </style>
+</head>
+<body>
+  <div class="card" id="root">
+    <div class="header">
+      <div>
+        <div class="title" id="plan_title">Loading...</div>
+        <div class="sub" id="plan_meta">Preparing workout</div>
+      </div>
+      <div class="top-controls">
+        <button class="toggle" id="audioToggle">Audio: ON</button>
+        <button class="toggle" id="pauseToggle" disabled>Pause</button>
+        <button class="toggle" id="exitBtn">Exit</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="media">
+        <div class="gif-box">
+          <img id="ex_gif" src="" alt="exercise gif">
+        </div>
+      </div>
+
+      <div style="width:100%;max-width:760px">
+        <div class="exname" id="ex_name">Exercise name</div>
+        <div class="meta" id="set_info">Set 1 of 1 • Total sets: 1</div>
+        <div class="meta" id="reps_info" style="margin-top:6px"></div>
+      </div>
+
+      <div class="controls">
+        <button class="btn primary" id="startBtn">Start</button>
+        <button class="btn ghost" id="nextBtn" disabled>Next</button>
+      </div>
+
+      <div class="small" id="progress_text">Exercise 0 / 0</div>
+      <div style="height:6px"></div>
+    </div>
+
+    <div class="footer">
+      <div class="small" id="footer_message">Rest between sets: 15s</div>
+      <div class="small">Powered — AI Workout</div>
+    </div>
+  </div>
+
+  <!-- Rest overlay -->
+  <div class="overlay-rest" id="rest_overlay">
+    <div class="box">
+      <div style="font-size:2rem;font-weight:800;margin-bottom:6px">Rest</div>
+      <div style="font-size:3rem" id="rest_counter">15</div>
+      <div style="color:rgba(255,255,255,0.75);margin-top:8px">Tap to skip rest</div>
+    </div>
+  </div>
+
+<script>
+  /* ---------------------------
+   AUTH CHECK
+----------------------------*/
+const userId = localStorage.getItem("current_user_id");
+const userName = localStorage.getItem("current_user_name");
+
+if (!userId || !userName) {
+    window.location.href = "../login.html";
+}
+
+/* ---------------------------
+   Config & Query params
+   --------------------------- */
+const REST_SECONDS = 15;
+const SHORT_COUNTDOWN = 3;
+
+function qp(name){ return new URLSearchParams(location.search).get(name); }
+
+const planId = qp("planId");
+const planName = qp("planName") || "Workout Plan";
+const dayNum = parseInt(qp("day") || "1", 10);
+const totalDays = parseInt(qp("totalDays") || "1", 10);
+
+/* ---------------------------
+   DOM Refs
+   --------------------------- */
+const el = {
+  title: document.getElementById("plan_title"),
+  meta: document.getElementById("plan_meta"),
+  gif: document.getElementById("ex_gif"),
+  exName: document.getElementById("ex_name"),
+  setInfo: document.getElementById("set_info"),
+  repsInfo: document.getElementById("reps_info"),
+  progressText: document.getElementById("progress_text"),
+  restOverlay: document.getElementById("rest_overlay"),
+  restCounter: document.getElementById("rest_counter"),
+  startBtn: document.getElementById("startBtn"),
+  nextBtn: document.getElementById("nextBtn"),
+  audioToggle: document.getElementById("audioToggle"),
+  pauseToggle: document.getElementById("pauseToggle"),
+  exitBtn: document.getElementById("exitBtn"),
+  footerMsg: document.getElementById("footer_message")
+};
+
+/* ---------------------------
+   State
+   --------------------------- */
+let state = {
+  exercises: [],       // array of exercises for this day
+  idx: 0,              // current exercise index
+  curSet: 1,           // current set within exercise
+  running: false,      // whether a set is running
+  autoStarted: false,  // user pressed Start once -> subsequent sets auto-start
+  paused: false,
+  timers: { countdown:null, timer:null, rest:null },
+  remain: { countdown:0, timer:0, rest:0 } // remaining seconds when paused
+};
+
+/* ---------------------------
+   Speech helper (fast & cancel prev)
+   --------------------------- */
+function speak(text){
+  if (!speechEnabled) return;
+  try{
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.02; u.pitch = 1.05; u.lang = 'en-US';
+    window.speechSynthesis.speak(u);
+  }catch(e){ console.warn("speak failed", e); }
+}
+
+/* ---------------------------
+   Audio toggle
+   --------------------------- */
+let speechEnabled = true;
+el.audioToggle.addEventListener('click', ()=>{
+  speechEnabled = !speechEnabled;
+  el.audioToggle.textContent = speechEnabled ? "Audio: ON" : "Audio: OFF";
+  if(!speechEnabled) window.speechSynthesis.cancel();
+});
+
+/* ---------------------------
+   Exit button
+   --------------------------- */
+el.exitBtn.onclick = ()=> {
+  if (confirm("Exit workout? Progress for this day will be preserved.")){
+    location.href = "../Intermediate/intermediate_home.html";
+  }
+};
+
+/* ---------------------------
+   Load exercises (from API)
+   - API returns { plan: { days: [ { dayNo, exercises: [ { exerciseId, exerciseName, gifPath, reps, sets, predictedType } ] } ] } }
+   --------------------------- */
+async function loadExercises(){
+  el.title.textContent = "Loading workout...";
+  el.meta.textContent = `Day ${dayNum} of ${totalDays}`;
+
+  try {
+    const r = await fetch(`/api/intermediate/plan/${encodeURIComponent(planId)}`);
+    if (!r.ok) throw new Error("status " + r.status);
+    const obj = await r.json();
+    const plan = obj.plan;
+    if (!plan || !Array.isArray(plan.days)) throw new Error("Invalid plan data");
+
+    const today = plan.days.find(d => Number(d.dayNo) === Number(dayNum));
+    if (!today || !Array.isArray(today.exercises) || today.exercises.length === 0){
+      el.title.textContent = plan.planName || planName;
+      el.meta.textContent = `Day ${dayNum} of ${totalDays}`;
+      el.exName.textContent = "No exercises for this day";
+      el.repsInfo.textContent = "";
+      el.setInfo.textContent = "";
+      el.startBtn.disabled = true;
+      el.nextBtn.disabled = true;
+      el.footerMsg.textContent = "No exercises found. Try generating a plan.";
+      return;
+    }
+
+    // Map to internal shape
+    state.exercises = today.exercises.map(e => ({
+      exerciseId: e.exerciseId || e.exercise_id,
+      exercise_name: e.exerciseName || e.exercise_name,
+      gif_path: e.gifPath || e.gif_path || '',
+      reps: Number(e.reps) || 12,
+      sets: Number(e.sets) || 1,
+      phase: (e.predictedType || e.predicted_type || '').toLowerCase()
+    }));
+
+    el.title.textContent = plan.planName || planName;
+    el.meta.textContent = `Day ${dayNum} of ${totalDays}`;
+
+    state.idx = 0; state.curSet = 1; state.running = false; state.autoStarted = false;
+    el.pauseToggle.textContent = "Pause"; el.pauseToggle.disabled = true;
+    el.nextBtn.disabled = true;
+    renderCurrent();
+  } catch(err){
+    console.error(err);
+    el.title.textContent = "Failed to load workout";
+    el.footerMsg.textContent = "Error loading plan.";
+    el.startBtn.disabled = true;
+  }
+}
+
+/* ---------------------------
+   Render current exercise
+   --------------------------- */
+function renderCurrent(){
+  const ex = state.exercises[state.idx];
+  // safety guard
+  if(!ex){
+    el.exName.textContent = "Workout complete";
+    el.setInfo.textContent = "";
+    el.repsInfo.textContent = "";
+    el.progressText.textContent = "";
+    el.startBtn.disabled = true;
+    el.nextBtn.disabled = true;
+    return;
+  }
+
+  // ensure gif source is correct:
+  let src = ex.gif_path || '';
+  if (!src) src = '';
+  if (!src.startsWith('/') && !src.match(/^https?:\/\//)) {
+    // assume filename -> use /gifs/
+    src = '/gifs/' + src;
+  }
+
+  // force reload to avoid stale cache / not showing new gif
+  el.gif.src = '';
+  setTimeout(()=> { el.gif.src = src; }, 30);
+
+  el.exName.textContent = ex.exercise_name;
+  el.setInfo.textContent = `Set ${state.curSet} of ${ex.sets}`;
+  el.repsInfo.textContent = (ex.phase === 'stretch' ? `${ex.reps} sec` : `${ex.reps} reps`);
+  el.progressText.textContent = `Exercise ${state.idx + 1} / ${state.exercises.length}`;
+
+  // Buttons: start enabled only if not autoStarted OR it's the very first Start
+  el.startBtn.disabled = (state.autoStarted || state.running); // if autoStarted true, Start disabled
+  // Next enabled only for reps-based when a set is active
+  el.nextBtn.disabled = true;
+}
+
+/* ---------------------------
+   Countdown helpers with pause/resume
+   --------------------------- */
+function clearTimers(){
+  if(state.timers.countdown){ clearInterval(state.timers.countdown); state.timers.countdown = null; }
+  if(state.timers.timer){ clearInterval(state.timers.timer); state.timers.timer = null; }
+  if(state.timers.rest){ clearInterval(state.timers.rest); state.timers.rest = null; }
+}
+
+function startCountdown(seconds, onTick, onDone){
+  // store remaining for pause
+  state.remain.countdown = seconds;
+  onTick(state.remain.countdown);
+
+  // fast immediate speak for first number to reduce perceived lag
+  if (speechEnabled) speak(String(state.remain.countdown));
+
+  state.timers.countdown = setInterval(()=>{
+    if (state.paused) return;
+    state.remain.countdown -= 1;
+    if(state.remain.countdown > 0){
+      onTick(state.remain.countdown);
+      if (state.remain.countdown <= 3 && speechEnabled) speak(String(state.remain.countdown));
+    } else {
+      clearInterval(state.timers.countdown); state.timers.countdown = null;
+      onDone();
+    }
+  }, 1000);
+}
+
+function startTimerSeconds(seconds, onTick, onDone){
+  state.remain.timer = seconds;
+  onTick(state.remain.timer);
+  if (speechEnabled) speak(`Hold for ${state.remain.timer} seconds`);
+
+  state.timers.timer = setInterval(()=>{
+    if(state.paused) return;
+    state.remain.timer -= 1;
+    if(state.remain.timer > 0){
+      onTick(state.remain.timer);
+      if(state.remain.timer <= 3 && speechEnabled) speak(String(state.remain.timer));
+    } else {
+      clearInterval(state.timers.timer); state.timers.timer = null;
+      onDone();
+    }
+  }, 1000);
+}
+
+/* ---------------------------
+   Rest countdown (pause/resume + skip)
+   --------------------------- */
+function doRest(seconds){
+  return new Promise(resolve=>{
+    el.restOverlay.style.display = 'flex';
+    el.restCounter.textContent = seconds;
+    state.remain.rest = seconds;
+
+    if(state.timers.rest) { clearInterval(state.timers.rest); state.timers.rest = null; }
+
+    // speak once at start
+    if(speechEnabled) speak(`Rest for ${state.remain.rest} seconds`);
+
+    state.timers.rest = setInterval(()=>{
+      if(state.paused) return;
+      state.remain.rest -= 1;
+      el.restCounter.textContent = state.remain.rest;
+      if(state.remain.rest <= 0){
+        clearInterval(state.timers.rest); state.timers.rest = null;
+        el.restOverlay.style.display = 'none';
+        // small 3..2..1 before next start
+        startCountdown(3, ()=>{}, ()=> resolve());
+      }
+    }, 1000);
+
+    // skip on click
+    el.restOverlay.onclick = ()=>{
+      if(state.timers.rest){ clearInterval(state.timers.rest); state.timers.rest = null; }
+      el.restOverlay.style.display = 'none';
+      // small 3..2..1
+      startCountdown(3, ()=>{}, ()=> resolve());
+    };
+  });
+}
+
+/* ---------------------------
+   Start set (first Start OR auto-start after rest)
+   Behavior:
+   - For time/stretch => start timer and auto-next when done.
+   - For reps => enable Next (user must press Next to indicate done).
+   --------------------------- */
+async function startSet(fromAuto=false){
+  // fromAuto indicates we were auto-starting after rest; we still show countdown and begin.
+  if(state.running) return;
+  const ex = state.exercises[state.idx];
+  if(!ex) return;
+
+  state.running = true;
+  el.startBtn.disabled = true;
+  el.pauseToggle.disabled = false;
+  el.pauseToggle.textContent = "Pause";
+  state.paused = false;
+
+  // mark that user tapped Start at least once
+  state.autoStarted = state.autoStarted || !fromAuto || state.autoStarted;
+
+  // 3..2..1 countdown
+  startCountdown(SHORT_COUNTDOWN, (n)=>{
+    el.repsInfo.textContent = `Starting in ${n}`;
+  }, ()=>{
+    // after countdown
+    if(ex.phase === 'stretch' || ex.phase === 'time'){
+      // time-based
+      startTimerSeconds(Number(ex.reps), (t)=>{
+        el.repsInfo.textContent = `${t} sec`;
+      }, async ()=>{
+        // set finished
+        state.running = false;
+        // if more sets remain -> rest then resume
+        if(state.curSet < ex.sets){
+          await doRest(REST_SECONDS);
+          state.curSet++;
+          renderCurrent();
+          // auto start next set
+          await startSet(true);
+          return;
+        }
+        // last set finished -> move to next exercise
+        await finishOrNextAfterExercise();
+      });
+    } else {
+      // reps-based: enable Next button; user will click Next when done
+      el.repsInfo.textContent = `${ex.reps} reps`;
+      el.nextBtn.disabled = false;
+      if (speechEnabled) speak(`Complete ${ex.reps} repetitions then press Next.`);
+    }
+  });
+}
+
+/* ---------------------------
+   Called when a set completes (auto for time/stretch OR user pressed Next)
+   Handles sets -> rest -> move to next or finish
+   --------------------------- */
+async function finishOrNextAfterExercise(){
+  const ex = state.exercises[state.idx];
+  // if more sets remaining:
+  if(state.curSet < ex.sets){
+    await doRest(REST_SECONDS);
+    state.curSet++;
+    renderCurrent();
+    // auto start next set if autoStarted (we want semi-automatic)
+    await startSet(true);
+    return;
+  }
+
+  // completed last set of current exercise -> advance to next exercise
+  state.idx++;
+  state.curSet = 1;
+  state.running = false;
+  if(state.idx >= state.exercises.length){
+    await finishDay();
+    return;
+  }
+
+  // rest between exercises then auto-start next exercise if user had started session
+  await doRest(REST_SECONDS);
+  renderCurrent();
+  if(state.autoStarted){
+    // small delay to let UI update
+    await new Promise(r => setTimeout(r, 200));
+    await startSet(true);
+  } else {
+    // If user never pressed start (weird) keep Start enabled
+    el.startBtn.disabled = false;
+  }
+}
+
+/* ---------------------------
+   Next button (for reps-based)
+   --------------------------- */
+el.nextBtn.addEventListener('click', async ()=>{
+  // disable to prevent double clicks
+  el.nextBtn.disabled = true;
+  // clear any countdown/timer
+  clearTimers();
+  state.running = false;
+
+  // if more sets remain, go to rest
+  const ex = state.exercises[state.idx];
+  if(state.curSet < ex.sets){
+    await doRest(REST_SECONDS);
+    state.curSet++;
+    renderCurrent();
+    // if autoStarted: auto-start set; else leave Start enabled? We'll auto-start only if user pressed Start initially
+    if(state.autoStarted){
+      await startSet(true);
+    } else {
+      // start remains enabled so user can start next set
+      el.startBtn.disabled = false;
+    }
+    return;
+  }
+
+  // last set -> move to next exercise
+  await finishOrNextAfterExercise();
+});
+
+/* ---------------------------
+   Pause/Resume logic (preserve remaining seconds)
+   - We pause countdown, timer, rest by setting 'paused' flag and not decreasing remain values.
+   - When resuming, intervals continue using remain values.
+   --------------------------- */
+el.pauseToggle.addEventListener('click', ()=>{
+  if(el.pauseToggle.disabled) return;
+  if(!state.paused){
+    // Pause
+    state.paused = true;
+    el.pauseToggle.textContent = "Resume";
+    el.pauseToggle.classList.add('paused');
+    // speech cancel immediate
+    window.speechSynthesis.cancel();
+  } else {
+    // Resume
+    state.paused = false;
+    el.pauseToggle.textContent = "Pause";
+    // No need to re-create timers; our intervals check state.paused and will continue decrementing.
+    // But if intervals were cleared (when set finished), ensure we re-create if needed (rare because we don't clear for pause).
+  }
+});
+
+/* ---------------------------
+   finishDay
+   --------------------------- */
+async function finishDay(){
+  // Voice feedback
+  speak("Congratulations. Workout complete.");
+
+  // Show celebration overlay
+  const overlay = document.getElementById("celebrationOverlay");
+  const text = document.getElementById("celebrationText");
+
+  text.textContent = `You completed Day ${dayNum} of ${planName}!`;
+
+  overlay.style.display = "flex";
+
+  // Start fireworks
+  startFireworks();
+
+  // Wait a few seconds to let speech finish + animation play
+  await new Promise(r => setTimeout(r, 5500));
+
+  // Save progress
+  localStorage.setItem("int_done_" + planId, String(dayNum));
+
+  // Redirect to intermediate dashboard
+  location.href = "../Intermediate/intermediate_home.html";
+}
+
+/* ---------------------------
+   Wire start button
+   --------------------------- */
+el.startBtn.addEventListener('click', async ()=>{
+  // If no exercises, do nothing
+  if (!state.exercises.length) return;
+  // mark autoStarted: user clicked start -> entire session considered started
+  state.autoStarted = true;
+  el.startBtn.disabled = true;
+  el.startBtn.style.pointerEvents = "none";
+  el.startBtn.style.opacity = "0.45";
+
+  el.nextBtn.disabled = true;
+  // enable pause
+  el.pauseToggle.disabled = false;
+  // start first set for current ex
+  await startSet(false);
+});
+
+/* ---------------------------
+   Init load
+   --------------------------- */
+loadExercises();
+
+/* ---------------------------
+   Clean up on unload
+   --------------------------- */
+window.addEventListener('beforeunload', ()=>{
+  clearTimers();
+  window.speechSynthesis.cancel();
+});
+/* ----------------------------------------------------------
+   SIMPLE FIREWORKS ANIMATION (Canvas)
+---------------------------------------------------------- */
+function startFireworks() {
+  const canvas = document.getElementById("fireworksCanvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+
+  const fireworks = [];
+
+  function Firework() {
+    this.x = Math.random() * canvas.width;
+    this.y = canvas.height;
+    this.targetY = Math.random() * (canvas.height * 0.4);
+    this.speed = 3;
+    this.exploded = false;
+    this.particles = [];
+  }
+
+  Firework.prototype.update = function () {
+    if (!this.exploded) {
+      this.y -= this.speed;
+      if (this.y <= this.targetY) {
+        this.exploded = true;
+        for (let i = 0; i < 40; i++) {
+          this.particles.push(new Particle(this.x, this.y));
+        }
+      }
+    } else {
+      this.particles.forEach((p) => p.update());
+    }
+  };
+
+  Firework.prototype.draw = function () {
+    if (!this.exploded) {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(this.x, this.y, 2, 8);
+    } else {
+      this.particles.forEach((p) => p.draw());
+    }
+  };
+
+  function Particle(x, y) {
+    this.x = x;
+    this.y = y;
+    this.angle = Math.random() * Math.PI * 2;
+    this.speed = Math.random() * 4 + 2;
+    this.life = 80;
+    this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+
+    this.update = function () {
+      this.x += Math.cos(this.angle) * this.speed;
+      this.y += Math.sin(this.angle) * this.speed;
+      this.life -= 1;
+    };
+
+    this.draw = function () {
+      ctx.globalAlpha = Math.max(this.life / 80, 0);
+      ctx.fillStyle = this.color;
+      ctx.fillRect(this.x, this.y, 3, 3);
+      ctx.globalAlpha = 1;
+    };
+  }
+
+  // Animation Loop
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (Math.random() < 0.06) fireworks.push(new Firework());
+    fireworks.forEach((f, i) => {
+      f.update();
+      f.draw();
+      if (f.exploded && f.particles.every(p => p.life <= 0)) {
+        fireworks.splice(i, 1);
+      }
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+}
+
+</script>
+<script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/09/12/13/20250912131740-W10O18WN.js" defer></script>
+
+<!-- FIREWORKS CELEBRATION OVERLAY -->
+<div id="celebrationOverlay" 
+     style="position:fixed; inset:0; background:rgba(0,0,0,0.85); 
+            display:none; justify-content:center; align-items:center; 
+            flex-direction:column; z-index:99999;">
+  <canvas id="fireworksCanvas" style="position:absolute; inset:0;"></canvas>
+
+  <div style="position:relative; z-index:10; text-align:center;">
+      <div style="font-size:2.5rem; font-weight:800; margin-bottom:8px;">
+          🎆 Workout Completed! 🎆
+      </div>
+      <div id="celebrationText" 
+           style="font-size:1.2rem; color:#ccc; margin-bottom:20px;">
+      </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Workout Plans</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background:#f5f5f5;
+            padding:30px;
+        }
+        h1{color:#333;}
+        .plan-card{
+            background:white;
+            padding:15px;
+            margin:10px 0;
+            border-radius:8px;
+            box-shadow:0 0 5px rgba(0,0,0,0.1);
+            cursor:pointer;
+        }
+        .plan-card:hover{
+            background:#e6f2ff;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Your Workout Plans</h1>
+<p>Click on a plan to view exercises.</p>
+
+<div id="plansList"></div>
+
+<script>
+function loadPlans(){
+    fetch("http://localhost:8080/api/intermediate/getPlans?userId=1")
+    .then(res=>res.json())
+    .then(plans => {
+        const container = document.getElementById("plansList");
+        container.innerHTML = "";
+
+        if(plans.length === 0){
+            container.innerHTML = "<p>No plans found.</p>";
+            return;
+        }
+
+        plans.forEach(plan=>{
+            const div = document.createElement("div");
+            div.className = "plan-card";
+            div.innerHTML = `
+                <strong>${plan.plan_name}</strong><br>
+                <b>Plan ID:</b> ${plan.plan_id}<br>
+                Level: ${plan.level}<br>
+                Duration: ${plan.total_duration} mins
+            `;
+
+            div.onclick = () => {
+    if (!plan.plan_id) {
+        alert("Invalid plan_id: " + JSON.stringify(plan));
+        return;
+    }
+    window.location.href = "plan_details.html?planId=" + plan.plan_id;
+};
+
+            container.appendChild(div);
+        });
+
+    })
+    .catch(err=>{
+        document.getElementById("plansList").innerHTML = "Error loading plans: " + err;
+    });
+}
+
+loadPlans();
+</script>
+
+</body>
+</html>

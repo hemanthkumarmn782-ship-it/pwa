@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Push-up Trainer (User Friendly)</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
+<style>
+body{margin:0;padding:0;font-family:'Segoe UI',Arial;
+background:linear-gradient(to bottom right,#1e3a8a,#9333ea,#ef4444);
+color:#f8fafc;text-align:center;min-height:100vh;}
+.container{display:flex;justify-content:center;align-items:flex-start;gap:25px;margin-top:20px;flex-wrap:wrap;}
+.card{background:rgba(17,24,39,0.85);border-radius:16px;padding:20px;
+box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:300px;}
+canvas{border-radius:16px;transform:scaleX(-1);}
+#feedback{font-size:1.3rem;margin-top:15px;font-weight:bold;min-height:50px;}
+button{background-color:#10b981;color:white;padding:10px 20px;border:none;border-radius:10px;
+font-size:1rem;cursor:pointer;margin:5px;}
+button:disabled{background-color:#6b7280;}
+#statusLight{width:15px;height:15px;border-radius:50%;display:inline-block;margin-left:10px;background-color:gray;}
+#accuracyCard{background:rgba(34,197,94,0.1);border:2px solid #22c55e;border-radius:12px;padding:15px;margin-top:15px;text-align:center;}
+
+/* NEW — Back Button */
+.back-btn{
+  position:absolute;top:15px;left:15px;
+  background:rgba(0,0,0,0.45);
+  padding:8px 14px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:600;
+}
+
+/* NEW — Camera View Label */
+.view-label{
+  position:absolute;top:15px;right:15px;
+  background:rgba(0,0,0,0.45);
+  padding:8px 14px;
+  border-radius:8px;
+  font-weight:bold;
+}
+
+/* NEW — Last 5 Accuracy Box */
+.accuracy-list-box{
+  margin-top:20px;
+  background:rgba(255,255,255,0.08);
+  padding:12px;
+  border-radius:12px;
+  text-align:left;
+}
+</style>
+</head>
+<body>
+
+<!-- NEW: BACK BUTTON -->
+<div class="back-btn" onclick="window.location.href='../Advance/advance_home.html'">← Back</div>
+
+<!-- NEW: CAMERA VIEW LABEL -->
+<div class="view-label">Side View</div>
+
+<h1>💪 Easy Push-up Trainer</h1>
+
+<div class="container">
+  <div class="card"><canvas id="output" width="640" height="480"></canvas></div>
+  
+  <div class="card" style="text-align:left;">
+    <h2>Live Feedback</h2>
+
+    <div id="feedback">Click START to begin</div>
+    <div id="counter"><b>Reps:</b> 0 / 5</div>
+    <div><b>Status:</b> <span id="statusLight"></span></div>
+
+    <div id="accuracyCard">
+      <h3>🏁 Workout Summary</h3>
+      <p id="accuracy"></p>
+      <button id="startBtn">START</button>
+      <button id="resetBtn" disabled>RESET</button>
+    </div>
+
+    <!-- NEW — LAST 5 ACCURACY -->
+    <div id="last5Box" class="accuracy-list-box">
+      <h3>📊 Last 5 Accuracy Scores</h3>
+      <ul id="last5List"></ul>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* -------------------------
+   PAGE AUTHENTICATION
+------------------------- */
+const currentUserId = localStorage.getItem("current_user_id");
+if (!currentUserId) {
+  window.location.href = "../login.html";
+}
+const EXERCISE_ID = 4; // pushup
+
+/* LOAD LAST 5 ACCURACY SCORES */
+async function loadLast5() {
+  try {
+    const res = await fetch(`/api/accuracy/last5/${currentUserId}/${EXERCISE_ID}`);
+    const data = await res.json();
+
+    const list = document.getElementById("last5List");
+    list.innerHTML = "";
+
+    if (data.length === 0) {
+      list.innerHTML = "<li>No history found</li>";
+      return;
+    }
+
+    data.forEach(a => {
+      const li = document.createElement("li");
+      li.textContent = `${a.posture_accuracy}%  —  ${a.date}`;
+      list.appendChild(li);
+    });
+  } catch (e) {
+    console.error("Accuracy fetch error", e);
+  }
+}
+loadLast5();
+
+/* ORIGINAL CODE BELOW — UNCHANGED */
+const canvas=document.getElementById('output');
+const ctx=canvas.getContext('2d');
+const feedback=document.getElementById('feedback');
+const counter=document.getElementById('counter');
+const accuracy=document.getElementById('accuracy');
+const start=document.getElementById('startBtn');
+const reset=document.getElementById('resetBtn');
+const light=document.getElementById('statusLight');
+const video=document.createElement('video');
+video.width=640;video.height=480;video.autoplay=true;video.muted=true;video.playsInline=true;
+
+let started=false,reps=0,isDown=false,goodFrames=0,totalFrames=0;
+const target=5;
+let neutralY=null;
+
+function angle(a,b,c){
+  const r=Math.atan2(c.y-b.y,c.x-b.x)-Math.atan2(a.y-b.y,a.x-b.x);
+  let ang=Math.abs(r*180/Math.PI);
+  if(ang>180)ang=360-ang;
+  return ang;
+}
+
+function onResults(r){
+  ctx.save();ctx.clearRect(0,0,640,480);
+  ctx.drawImage(r.image,0,0,640,480);
+  if(!r.poseLandmarks){ctx.restore();return;}
+  drawConnectors(ctx,r.poseLandmarks,POSE_CONNECTIONS,{color:'#00ffcc',lineWidth:3});
+  drawLandmarks(ctx,r.poseLandmarks,{color:'#ff006e',radius:3});
+
+if (started && reps < target) {
+    const lm = r.poseLandmarks;
+
+    const rEl = angle(lm[11], lm[13], lm[15]);
+    const lEl = angle(lm[12], lm[14], lm[16]);
+    const avgEl = (rEl + lEl) / 2;
+
+    const backR = angle(lm[11], lm[23], lm[25]);
+    const backL = angle(lm[12], lm[24], lm[26]);
+    const avgBack = (backR + backL) / 2;
+
+    const avgShoulderY = (lm[11].y + lm[12].y) / 2;
+    const avgHipY = (lm[23].y + lm[24].y) / 2;
+    const bodyY = (avgShoulderY + avgHipY) / 2;
+
+    if (neutralY === null) neutralY = bodyY;
+    const downThresh = neutralY + 0.05;
+
+    let good = true;
+    let msgs = [];
+
+    if (avgHipY < avgShoulderY - 0.05) {
+        good = false;
+        msgs.push("Lower your hips a bit — avoid lifting them too high");
+    }
+    if (avgHipY > avgShoulderY + 0.05) {
+        good = false;
+        msgs.push("Raise your hips — keep your body straight");
+    }
+    if (avgBack < 140) {
+        good = false;
+        msgs.push("Keep your back straight — avoid arching");
+    }
+    if (avgEl > 160) {
+        good = false;
+        msgs.push("Keep elbows slightly closer to the body");
+    }
+    if (bodyY < downThresh - 0.05 && avgEl < 140 && !isDown) {
+        good = false;
+        msgs.push("Go a little lower for full range");
+    }
+    if (lm[0].y < lm[11].y - 0.08) {
+        good = false;
+        msgs.push("Keep your neck neutral — don't look up too much");
+    }
+
+    if (bodyY > downThresh && avgEl < 120 && !isDown) {
+        isDown = true;
+        feedback.innerText = "⬇️ Down phase...";
+    }
+    else if (bodyY < neutralY && avgEl > 130 && isDown) {
+        isDown = false;
+        reps++;
+        feedback.innerText = `⬆️ Rep ${reps} completed! Great job 👏`;
+        counter.innerHTML = `<b>Reps:</b> ${reps} / ${target}`;
+    }
+
+    light.style.backgroundColor = good ? 'limegreen' : 'red';
+    if (!good) feedback.innerText = msgs.join(" | ");
+
+    totalFrames++;
+    if (good) goodFrames++;
+
+    if (reps >= target) finish();
+}
+
+  ctx.restore();
+}
+
+async function finish(){
+  started=false;start.disabled=true;reset.disabled=false;
+  const acc=((goodFrames/totalFrames)*100).toFixed(1);
+  feedback.innerText='🏁 Workout complete!';
+  accuracy.innerHTML=`<b>Posture Accuracy:</b> ${acc}%`;
+  light.style.backgroundColor='gold';
+
+  /* NEW — SAVE ACCURACY */
+  await fetch("/api/accuracy/add", {
+    method:"POST",
+    headers:{ "Content-Type":"application/json"},
+    body:JSON.stringify({
+      userId: currentUserId,
+      exerciseId: EXERCISE_ID,
+      postureAccuracy: acc
+    })
+  });
+
+  /* reload last 5 */
+  loadLast5();
+}
+
+start.onclick=()=>{
+  started=true;reps=0;isDown=false;goodFrames=0;totalFrames=0;neutralY=null;
+  feedback.innerText='✅ Exercise started! Let’s go!';
+  start.disabled=true;reset.disabled=false;
+  counter.innerHTML=`<b>Reps:</b> 0 / ${target}`;
+  light.style.backgroundColor='limegreen';
+};
+reset.onclick=()=>{
+  started=false;reps=0;isDown=false;goodFrames=0;totalFrames=0;neutralY=null;
+  feedback.innerText='🔁 Ready for next session!';
+  counter.innerHTML=`<b>Reps:</b> 0 / ${target}`;
+  start.disabled=false;reset.disabled=true;
+  accuracy.innerText='';
+  light.style.backgroundColor='gray';
+};
+
+const pose=new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`});
+pose.setOptions({
+  modelComplexity:1,
+  smoothLandmarks:true,
+  enableSegmentation:false,
+  minDetectionConfidence:0.5,
+  minTrackingConfidence:0.5
+});
+pose.onResults(onResults);
+
+const camera=new Camera(video,{onFrame:async()=>{await pose.send({image:video});},width:640,height:480});
+camera.start().catch(e=>{
+  feedback.innerText='⚠️ Allow camera permission!';
+  console.error(e);
+});
+</script>
+<script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/09/12/13/20250912131740-W10O18WN.js" defer></script>
+</body>
+</html>

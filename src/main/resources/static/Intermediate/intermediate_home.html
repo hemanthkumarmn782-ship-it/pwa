@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Intermediate — AI Workout Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg1:#0f1440;
+  --bg2:#241647;
+  --card:rgba(255,255,255,0.05);
+  --border:rgba(255,255,255,0.08);
+  --muted:rgba(255,255,255,0.7);
+  --accent:linear-gradient(90deg,#5eead4,#60a5fa);
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Inter',sans-serif;color:#fff}
+
+body{
+  background:linear-gradient(180deg,var(--bg1),var(--bg2));
+  min-height:100vh;
+  padding:20px;
+  display:flex;
+  justify-content:center;
+}
+
+.app{
+  display:grid;
+  grid-template-columns:260px 1fr;
+  gap:18px;
+  width:100%;
+  max-width:1500px;
+}
+
+/* SIDEBAR */
+.sidebar{
+  background:var(--card);
+  border:1px solid var(--border);
+  padding:20px;
+  border-radius:14px;
+  height:calc(100vh - 40px);
+  backdrop-filter:blur(10px);
+}
+
+.logo{
+  width:48px;height:48px;border-radius:10px;
+  background:linear-gradient(135deg,#60a5fa,#7c3aed);
+  display:grid;place-items:center;font-weight:800;
+}
+.brand{
+  display:flex;gap:10px;align-items:center;margin-bottom:14px;
+}
+
+.group-item{
+  padding:12px;
+  margin-top:8px;
+  border-radius:8px;
+  cursor:pointer;
+  color:var(--muted);
+  font-weight:600;
+}
+.group-item:hover,
+.group-item.active{
+  background:rgba(255,255,255,0.08);
+  color:white;
+}
+
+/* LOGOUT BUTTON */
+.logout-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+.logout-btn {
+  width: 70%;
+  padding: 10px 14px;
+  text-align: center;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(90deg, #ff6b6b, #ff8e53);
+  color: #1b0f1f;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+  transition: 0.25s ease;
+}
+.logout-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(255, 107, 107, 0.35);
+}
+
+/* MAIN */
+.content{
+  background:var(--card);
+  border-radius:14px;
+  border:1px solid var(--border);
+  backdrop-filter:blur(6px);
+  padding:22px;
+  height:calc(100vh - 40px);
+  overflow-y:auto;
+}
+
+.content-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+}
+
+/* MODE DROPDOWN */
+.dropdown{position:relative;}
+.dropdown-btn{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.1);
+  padding:8px 14px;
+  border-radius:8px;
+  color:var(--muted);
+  font-weight:700;
+  cursor:pointer;
+}
+.dropdown-btn:hover{
+  background:rgba(255,255,255,0.08);
+}
+.dropdown-menu{
+  position:absolute;
+  right:0;
+  top:110%;
+  background:rgba(17,25,40,0.95);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:8px;
+  display:none;
+  flex-direction:column;
+  min-width:160px;
+  z-index:20;
+}
+.dropdown-menu button{
+  background:none;border:0;color:#fff;
+  padding:10px 14px;text-align:left;cursor:pointer;
+}
+.dropdown-menu button:hover{
+  background:rgba(255,255,255,0.08);
+}
+
+/* Progress */
+.plan-progress-card{
+  padding:18px;
+  border-radius:12px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border);
+}
+.progress-bar{
+  width:100%;height:10px;border-radius:6px;background:rgba(255,255,255,0.3);margin-top:6px;
+}
+.progress-fill{
+  height:100%;background:var(--accent);transition:width 0.3s ease;
+}
+
+.btn{
+  padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:700
+}
+.btn.primary{
+  background:var(--accent);color:#041026
+}
+.btn.ghost{
+  background:transparent;border:1px solid var(--border);color:var(--muted)
+}
+
+/* 2 Cards per row */
+#plansContainer {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(420px, 1fr));
+  gap:20px;
+}
+
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">AW</div>
+      <div>
+        <div style="font-weight:800">AI Workout</div>
+        <div style="color:var(--muted);font-size:0.85rem">Intermediate</div>
+      </div>
+    </div>
+
+    <nav id="areaList"></nav>
+
+    <div class="group-item"
+         onclick="openGenModal()"
+         style="margin-top:12px;background:rgba(255,255,255,0.08);text-align:center;font-weight:800;color:white">
+      ＋ Generate Plan
+    </div>
+
+    <div class="logout-container">
+      <div class="logout-btn" onclick="handleLogout()">Logout</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="content">
+
+    <!-- HEADER -->
+    <div class="content-header">
+      <div>
+        <div style="color:var(--muted)">
+          Welcome back, <strong id="usernameDisplay"></strong>
+        </div>
+        <div style="font-size:1.2rem;font-weight:800;">Intermediate Mode</div>
+      </div>
+
+      <div class="dropdown" id="modeDropdown">
+        <button class="dropdown-btn" id="dropdownBtn">Mode: Intermediate ▾</button>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <button data-mode="beginner">Beginner</button>
+          <button data-mode="intermediate">Intermediate</button>
+          <button data-mode="advanced">Advanced</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard">
+      <div style="font-size:1.4rem;font-weight:800;">Your Plans</div>
+
+      <button class="btn primary" style="margin:12px 0;padding:12px 18px;font-size:0.95rem;border-radius:10px"
+              onclick="openGenModal()">
+        ＋ Generate New Plan
+      </button>
+
+      <div style="color:var(--muted);font-size:0.95rem;margin-bottom:12px">
+        Progress overview of each Intermediate plan
+      </div>
+
+      <div id="plansContainer"></div>
+    </div>
+
+    <!-- AREA VIEW -->
+    <div id="areaView" style="display:none"></div>
+
+    <!-- DAY VIEW -->
+    <div id="dayView" style="display:none"></div>
+
+  </main>
+</div>
+
+<!-- ------------- PLAN GENERATION MODAL --------------- -->
+<div class="overlay" id="genOverlay" 
+     style="position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;
+            justify-content:center;align-items:center;z-index:9999;">
+  <div class="modal" 
+       style="width:500px;background:#0f1724;border-radius:14px;padding:20px;
+              border:1px solid rgba(255,255,255,0.1);">
+
+    <h3 style="margin-bottom:12px;font-weight:800">Generate Workout Plan</h3>
+
+    <label style="color:#bbb;font-size:0.9rem">Area</label>
+    <select id="genArea"
+            style="width:100%;padding:10px;margin-top:4px;border-radius:8px;
+                   background:#101a3a;border:1px solid rgba(255,255,255,0.1);">
+      <option>Arms & Chest</option>
+      <option>Abs</option>
+      <option>Legs</option>
+      <option>Full Body</option>
+    </select>
+
+    <label style="color:#bbb;font-size:0.9rem;margin-top:10px;display:block">Type</label>
+    <select id="genType"
+            style="width:100%;padding:10px;margin-top:4px;border-radius:8px;
+                   background:#101a3a;border:1px solid rgba(255,255,255,0.1);">
+      <option value="weekly">Weekly</option>
+      <option value="monthly">Monthly</option>
+    </select>
+
+    <label style="color:#bbb;font-size:0.9rem;margin-top:10px;display:block">Suggested Names</label>
+    <select id="genSuggest"
+            style="width:100%;padding:10px;margin-top:4px;border-radius:8px;
+                   background:#101a3a;border:1px solid rgba(255,255,255,0.1);">
+    </select>
+
+    <label style="color:#bbb;font-size:0.9rem;margin-top:10px;display:block">Custom Name (Optional)</label>
+    <input id="genName"
+           placeholder="Or enter your own name"
+           style="width:100%;padding:10px;margin-top:4px;border-radius:8px;
+                  background:#101a3a;border:1px solid rgba(255,255,255,0.1);" />
+
+    <div style="margin-top:15px;display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn ghost" onclick="closeGenModal()">Cancel</button>
+      <button class="btn primary" onclick="createPlan()">Generate</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ------------- SCRIPT --------------- -->
+<script>
+/* ==========================================================
+   PAGE AUTH + USER
+========================================================== */
+const currentUserId = localStorage.getItem("current_user_id");
+const currentUserName = localStorage.getItem("current_user_name");
+
+if (!currentUserId || !currentUserName) {
+  window.location.href = "../login.html";
+}
+
+document.getElementById("usernameDisplay").textContent = currentUserName;
+
+function handleLogout(){
+  localStorage.clear();
+  window.location.href = "../logout.html";
+}
+
+const USER_ID = currentUserId;
+
+/* ==========================================================
+   SIDEBAR AREA LIST
+========================================================== */
+const AREAS = ["Arms & Chest","Abs","Legs","Full Body"];
+const areaList=document.getElementById('areaList');
+
+AREAS.forEach(a=>{
+  const div=document.createElement("div");
+  div.className='group-item';
+  div.textContent=a;
+  div.onclick=()=>openArea(a);
+  areaList.appendChild(div);
+});
+
+/* ==========================================================
+   LOAD DASHBOARD
+========================================================== */
+async function loadPlansDashboard(){
+  const response = await fetch(`/api/intermediate/user-plans/${USER_ID}`);
+  const data = await response.json();
+
+  const plans = data.plans;
+  const container = document.getElementById("plansContainer");
+  container.innerHTML = "";
+
+  if (!plans || plans.length === 0) {
+    container.innerHTML = `<div style="color:var(--muted);font-size:1rem">No plans found.</div>`;
+    return;
+  }
+
+  for (const plan of plans) {
+    const planId = plan.planId;
+    const r2 = await fetch(`/api/intermediate/plan/${planId}`);
+    const d2 = await r2.json();
+
+    const totalDays = d2.plan.days.length;
+    const completed = parseInt(localStorage.getItem("int_done_"+planId) || 0);
+    const pct = Math.round((completed / totalDays) * 100);
+
+    container.innerHTML += `
+      <div class="plan-progress-card">
+        <div style="font-weight:800;font-size:1.1rem">${plan.planName}</div>
+        <div style="color:var(--muted);font-size:0.9rem">Type: ${plan.planType}</div>
+        <div style="color:var(--muted);font-size:0.9rem">
+          Progress: ${completed}/${totalDays} days
+        </div>
+
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${pct}%"></div>
+        </div>
+
+        <button class="btn primary" style="margin-top:12px"
+                onclick="openArea('${plan.level}')">
+          View Plan
+        </button>
+      </div>
+    `;
+  }
+}
+
+loadPlansDashboard();
+
+/* ==========================================================
+   MODE TOGGLE
+========================================================== */
+const dropdownBtn=document.getElementById("dropdownBtn");
+const dropdownMenu=document.getElementById("dropdownMenu");
+
+dropdownBtn.onclick=()=>{
+  dropdownMenu.style.display = 
+    dropdownMenu.style.display==="flex" ? "none" : "flex";
+  dropdownMenu.style.flexDirection="column";
+};
+
+document.addEventListener("click",e=>{
+  if(!e.target.closest("#modeDropdown"))
+    dropdownMenu.style.display="none";
+});
+
+dropdownMenu.querySelectorAll("button")
+  .forEach(btn=>{
+    btn.onclick=()=>{
+      const mode=btn.dataset.mode;
+
+      localStorage.setItem("aw_mode", mode);
+
+      if(mode==="beginner") location.href="/home.html";
+      if(mode==="intermediate") location.href="/Intermediate/intermediate_home.html";
+      if(mode==="advanced") location.href="/Advance/advance_home.html";
+    };
+  });
+
+/* ==========================================================
+   GENERATE PLAN MODAL
+========================================================== */
+const genOverlay=document.getElementById("genOverlay");
+const genArea=document.getElementById("genArea");
+const genType=document.getElementById("genType");
+const genSuggest=document.getElementById("genSuggest");
+const genName=document.getElementById("genName");
+
+const SUGGEST={
+  "Arms & Chest": {
+    weekly:["Iron Push Week","Chest Sculpt 7","Arm Power Week"],
+    monthly:["Upper Burn 30","Sculpt & Strength 30","Chest Builder 30"]
+  },
+  "Abs": {
+    weekly:["Core Blast 7","ABS Shred Week","Flat Core 7"],
+    monthly:["Core 30","ABS Transformation 30","Cutting Core 30"]
+  },
+  "Legs": {
+    weekly:["Leg Power 7","Lower Body Week","Leg Sculpt Week"],
+    monthly:["Legs 30","Lower Strength 30","Leg Builder 30"]
+  },
+  "Full Body": {
+    weekly:["Full Body 7","Total Burn Week","Fit Week 7"],
+    monthly:["Full Body 30","Body Reset 30","Total Sculpt 30"]
+  }
+};
+
+function openGenModal(){
+  fillSuggestion();
+  genName.value="";
+  genOverlay.style.display="flex";
+}
+function closeGenModal(){
+  genOverlay.style.display="none";
+}
+
+genArea.onchange = fillSuggestion;
+genType.onchange = fillSuggestion;
+
+function fillSuggestion(){
+  const area=genArea.value;
+  const type=genType.value;
+
+  genSuggest.innerHTML = "";
+  SUGGEST[area][type].forEach(name=>{
+    const opt=document.createElement("option");
+    opt.textContent=name;
+    genSuggest.appendChild(opt);
+  });
+}
+
+async function createPlan(){
+  const category = genArea.value;
+  const type = genType.value;
+  const finalName = genName.value.trim() || genSuggest.value;
+
+  const body = {
+    userId: parseInt(currentUserId),
+    category: category,
+    type: type,
+    name: finalName
+  };
+
+  const res = await fetch("/api/intermediate/generate-plan", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(body)
+  });
+
+  if (res.ok) {
+    closeGenModal();
+    loadPlansDashboard();
+  } else {
+    alert("Failed to generate plan");
+  }
+}
+
+/* ==========================================================
+   OPEN AREA / DAYS
+========================================================== */
+async function openArea(area){
+  document.getElementById("dashboard").style.display='none';
+  document.getElementById("dayView").style.display='none';
+
+  const areaView=document.getElementById("areaView");
+  areaView.style.display='block';
+
+  const r=await fetch(`/api/intermediate/user-plans/${USER_ID}`);
+  const data=await r.json();
+  const weekly=[];
+  const monthly=[];
+
+  data.plans.forEach(p=>{
+    if(p.level!==area) return;
+    if(p.planType==="weekly") weekly.push(p);
+    else monthly.push(p);
+  });
+
+  areaView.innerHTML=`
+    <div style="font-size:1.4rem;font-weight:800;">${area} Plans</div>
+    <div style="color:var(--muted);font-size:0.95rem;margin-bottom:12px">
+      Weekly & Monthly Plans
+    </div>
+
+    <div style="display:flex;gap:20px">
+      <div style="flex:1">
+        <h3>Weekly</h3>
+        <div id="weeklyList"></div>
+      </div>
+
+      <div style="flex:1">
+        <h3>Monthly</h3>
+        <div id="monthlyList"></div>
+      </div>
+    </div>
+  `;
+
+  const wk=document.getElementById("weeklyList");
+  const mn=document.getElementById("monthlyList");
+
+  if(weekly.length===0) wk.innerHTML="<div style='color:var(--muted)'>No weekly plans</div>";
+  if(monthly.length===0) mn.innerHTML="<div style='color:var(--muted)'>No monthly plans</div>";
+
+  weekly.forEach(p=> wk.appendChild(makePlanCard(p,area)));
+  monthly.forEach(p=> mn.appendChild(makePlanCard(p,area)));
+}
+
+function makePlanCard(plan,area){
+  const div=document.createElement("div");
+  div.className="plan-progress-card";
+  div.style.marginTop="10px";
+
+  div.innerHTML=`
+    <div style="font-weight:800">${plan.planName}</div>
+    <div style="color:var(--muted);font-size:0.9rem">Type: ${plan.planType}</div>
+    <button class="btn primary" style="margin-top:10px"
+      onclick="openDays(${plan.planId}, '${plan.planName}', '${area}')">
+      View Days
+    </button>
+  `;
+  return div;
+}
+
+async function openDays(planId,planName,area){
+  document.getElementById("areaView").style.display='none';
+
+  const dayView=document.getElementById("dayView");
+  dayView.style.display='block';
+
+  const r=await fetch(`/api/intermediate/plan/${planId}`);
+  const data=await r.json();
+
+  const days = data.plan.days;
+  const completed = parseInt(localStorage.getItem("int_done_"+planId) || "0");
+
+  dayView.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+      <div>
+        <div style="font-size:1.4rem;font-weight:800;">${planName}</div>
+        <div style="color:var(--muted)">Days: ${days.length} — Completed: ${completed}</div>
+      </div>
+      <button class="btn ghost" onclick="openArea('${area}')">✕ Close</button>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:10px" id="daysWrap"></div>
+  `;
+
+  const wrap=document.getElementById("daysWrap");
+
+  days.forEach(d=>{
+    const state = 
+       d.dayNo <= completed ? "Completed"
+     : d.dayNo === completed + 1 ? "Available"
+     : "Locked";
+
+    wrap.innerHTML += `
+      <div class="plan-progress-card" style="width:150px;text-align:center">
+        <div style="font-weight:800;">Day ${d.dayNo}</div>
+        <div style="color:var(--muted);font-size:0.85rem">${state}</div>
+
+        <button class="btn primary" ${state==="Locked"?"disabled":""}
+          onclick="startDay(${planId}, '${planName}', ${d.dayNo}, ${days.length})">
+          ${state==="Completed"?"View":"Start"}
+        </button>
+      </div>
+    `;
+  });
+}
+
+function startDay(planId,planName,day,total){
+  location.href = `start_workout.html?planId=${planId}&planName=${encodeURIComponent(planName)}&day=${day}&totalDays=${total}`;
+}
+
+</script>
+<script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/09/12/13/20250912131740-W10O18WN.js" defer></script>
+</body>
+</html>

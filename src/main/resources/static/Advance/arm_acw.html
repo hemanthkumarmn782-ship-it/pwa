@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Arm Circles (Anti-clockwise)</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
+
+<style>
+body{
+  margin:0;padding:0;font-family:'Segoe UI',Arial;
+  background:linear-gradient(to bottom right,#1e3a8a,#9333ea,#ef4444);
+  color:#f8fafc;text-align:center;min-height:100vh;position:relative;
+}
+
+.top-info{
+  position:absolute;top:10px;right:15px;
+  background:rgba(0,0,0,0.4);
+  padding:8px 14px;border-radius:10px;
+  font-size:1rem;font-weight:700;
+}
+
+.back-btn{
+  position:absolute;top:10px;left:15px;
+  background:rgba(255,255,255,0.15);
+  padding:8px 14px;border-radius:10px;font-weight:700;
+  cursor:pointer;
+}
+
+.container{
+  display:flex;justify-content:center;align-items:flex-start;
+  gap:25px;margin-top:60px;flex-wrap:wrap;
+}
+.card{
+  background:rgba(17,24,39,0.85);border-radius:16px;
+  padding:20px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:300px;
+}
+canvas{border-radius:16px;transform:scaleX(-1);}
+
+#feedback {
+  font-size:1.3rem;
+  margin-top:15px;
+  font-weight:bold;
+  min-height:50px;
+
+  display: -webkit-box;
+  display: box; /* fallback */
+  -webkit-box-orient: vertical;
+  box-orient: vertical;
+
+  -webkit-line-clamp: 2;
+  line-clamp: 2; /* <-- This removes VS Code warning */
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+button{background-color:#10b981;color:white;padding:10px 20px;border:none;border-radius:10px;font-size:1rem;cursor:pointer;margin:5px;}
+button:disabled{background-color:#6b7280;}
+
+#statusLight{
+  width:15px;height:15px;border-radius:50%;display:inline-block;
+  margin-left:10px;background-color:gray;
+}
+
+#accuracyCard{
+  background:rgba(34,197,94,0.1);
+  border:2px solid #22c55e;
+  border-radius:12px;padding:15px;margin-top:15px;text-align:center;
+}
+
+#historyBox{
+  margin-top:20px;padding:15px;
+  background:rgba(0,0,0,0.35);
+  border-radius:14px;text-align:left;
+}
+
+</style>
+</head>
+<body>
+
+<!-- BACK BUTTON -->
+<div class="back-btn" onclick="location.href='../Advance/advance_home.html'">⬅ Back</div>
+
+<!-- VIEW INDICATOR -->
+<div class="top-info">📷 Front View</div>
+
+<h1>🔄 Arm Circles Trainer (Anti-clockwise)</h1>
+
+<div class="container">
+  <div class="card"><canvas id="output" width="640" height="480"></canvas></div>
+
+  <div class="card" style="text-align:left;">
+    <h2>Live Feedback</h2>
+
+    <div id="feedback">Click START to begin</div>
+    <div id="counter"><b>Circles:</b> 0 / 5</div>
+    <div><b>Status:</b> <span id="statusLight"></span></div>
+
+    <div id="accuracyCard">
+      <h3>🏁 Workout Summary</h3>
+      <p id="accuracy"></p>
+      <button id="startBtn">START</button>
+      <button id="resetBtn" disabled>RESET</button>
+    </div>
+
+    <!-- LAST 5 ACCURACY SCORES -->
+    <div id="historyBox">
+      <h3>📊 Last 5 Accuracy Scores</h3>
+      <ul id="historyList" style="padding-left:18px;"></ul>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* -------------------------------
+   PAGE AUTHENTICATION
+--------------------------------*/
+const userId = localStorage.getItem("current_user_id");
+if (!userId) location.href = "../login.html";
+
+const exerciseId = 3; // arm_acw = 3
+
+/* -------------------------------
+   ORIGINAL CODE (UNCHANGED)
+--------------------------------*/
+const c=document.getElementById('output'),ctx=c.getContext('2d');
+const fb=document.getElementById('feedback');
+const ct=document.getElementById('counter');
+const ac=document.getElementById('accuracy');
+const st=document.getElementById('startBtn');
+const rs=document.getElementById('resetBtn');
+const lt=document.getElementById('statusLight');
+const historyList=document.getElementById("historyList");
+
+const v=document.createElement('video');
+v.width=640;v.height=480;
+v.autoplay=true;v.muted=true;v.playsInline=true;
+
+let start=false,count=0,phase=0,good=0,total=0;
+const target=5;
+
+function angle(a,b,c){
+  const r=Math.atan2(c.y-b.y,c.x-b.x)-Math.atan2(a.y-b.y,a.x-b.x);
+  let ang=Math.abs(r*180/Math.PI);
+  return ang>180?360-ang:ang;
+}
+
+/* -------------------------------
+   SAVE ACCURACY TO BACKEND
+--------------------------------*/
+async function saveAccuracy(acc){
+  try{
+    await fetch("http://localhost:8080/api/accuracy/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: { user_id: parseInt(userId) },
+        exercise: { exercise_id: exerciseId },
+        posture_accuracy: acc
+      })
+    });
+  }catch(e){
+    console.error("Save Error:", e);
+  }
+}
+
+
+/* -------------------------------
+   LOAD LAST 5 SCORES
+--------------------------------*/
+async function loadHistory(){
+  historyList.innerHTML = "<li>Loading...</li>";
+  try{
+    const res = await fetch(
+  `http://localhost:8080/api/accuracy/recent/${userId}/${exerciseId}`
+);
+
+    const list = await res.json();
+
+    historyList.innerHTML = "";
+    if(list.length === 0){
+      historyList.innerHTML = "<li>No previous results</li>";
+      return;
+    }
+
+    list.forEach(i=>{
+      const li=document.createElement("li");
+      li.textContent = `${i.posture_accuracy}% on ${i.date}`;
+      historyList.appendChild(li);
+    });
+
+  }catch(e){
+    historyList.innerHTML = "<li>Error loading scores</li>";
+  }
+}
+loadHistory();
+
+/* -------------------------------
+   ORIGINAL POSE LOGIC (UNMODIFIED)
+--------------------------------*/
+function onResults(r){
+ ctx.save();
+ ctx.clearRect(0,0,640,480);
+ ctx.drawImage(r.image,0,0,640,480);
+
+ if(r.poseLandmarks){
+   drawConnectors(ctx,r.poseLandmarks,POSE_CONNECTIONS,{color:'#00ffcc',lineWidth:4});
+   drawLandmarks(ctx,r.poseLandmarks,{color:'#ff006e',radius:4});
+
+   if (start && count < target) {
+
+    const lm = r.poseLandmarks;
+    const sh = lm[11];
+    const el = lm[13];
+    const wr = lm[15];
+
+    const elbowAngle = angle(sh, el, wr);
+    let postureOk = true;
+    let msgs = [];
+
+    if (elbowAngle < 150){
+        postureOk = false;
+        msgs.push("Don't bend your elbow — keep your arm straight");
+    }
+    if (wr.y < sh.y - 0.05){
+        postureOk = false;
+        msgs.push("Avoid raising your arm too high");
+    }
+    if (wr.y > sh.y + 0.35){
+        postureOk = false;
+        msgs.push("Don't drop your arm too low");
+    }
+
+    const dx = wr.x - sh.x;
+    const dy = wr.y - sh.y;
+
+    let currentPhase = phase;
+
+    if (dx < -0.10 && dy > -0.05)        currentPhase = 1;
+    else if (dy > 0.12)                 currentPhase = 2;
+    else if (dx > 0.10 && dy > -0.05)   currentPhase = 3;
+    else if (dy < -0.10)                currentPhase = 4;
+
+    if (phase === 4 && currentPhase === 1){
+        count++;
+        fb.innerText = `⭕ Good! Circle ${count} complete`;
+        ct.innerHTML = `<b>Circles:</b> ${count} / ${target}`;
+    }
+
+    phase = currentPhase;
+
+    lt.style.backgroundColor = postureOk?'limegreen':'red';
+    total++;
+    if(postureOk)good++;
+
+    if (!postureOk) fb.innerText = msgs.join(" | ");
+    else if (msgs.length === 0 && count < target)
+        fb.innerText = "Smooth circular motion — good job!";
+
+    if (count >= target) finish();
+   }
+ }
+
+ ctx.restore();
+}
+
+/* -------------------------------
+   FINISH + SAVE SCORE
+--------------------------------*/
+function finish(){
+  start=false;st.disabled=true;rs.disabled=false;
+  const acc=((good/total)*100).toFixed(1);
+  fb.innerText='🏁 Done!';
+  ac.innerHTML=`<b>Form Accuracy:</b> ${acc}%`;
+  lt.style.backgroundColor='gold';
+
+  saveAccuracy(acc);
+  loadHistory();
+}
+
+/* -------------------------------
+   START & RESET (UNMODIFIED)
+--------------------------------*/
+st.onclick=()=>{
+  start=true;count=0;phase=0;good=0;total=0;
+  fb.innerText='✅ Started!';
+  st.disabled=true;rs.disabled=false;
+  ct.innerHTML=`<b>Circles:</b> 0 / ${target}`;
+  lt.style.backgroundColor='limegreen';
+};
+
+rs.onclick=()=>{
+  start=false;count=0;phase=0;good=0;total=0;
+  fb.innerText='🔁 Ready!';
+  ct.innerHTML=`<b>Circles:</b> 0 / ${target}`;
+  st.disabled=false;rs.disabled=true;
+  ac.innerText='';
+  lt.style.backgroundColor='gray';
+};
+
+/* -------------------------------
+   Pose + Camera
+--------------------------------*/
+const pose=new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`});
+pose.setOptions({
+  modelComplexity:1,smoothLandmarks:true,enableSegmentation:false,
+  minDetectionConfidence:0.5,minTrackingConfidence:0.5
+});
+pose.onResults(onResults);
+
+const cam=new Camera(v,{
+  onFrame:async()=>{await pose.send({image:v});},width:640,height:480
+});
+cam.start().catch(e=>{
+  fb.innerText='⚠️ Allow camera!';
+  console.error(e);
+});
+</script>
+<script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/09/12/13/20250912131740-W10O18WN.js" defer></script>
+</body>
+</html>

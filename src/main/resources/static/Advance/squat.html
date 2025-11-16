@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Intermediate Squat Posture Trainer</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
+
+<style>
+ body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Arial;
+  background: linear-gradient(to bottom right, #1e3a8a, #9333ea, #ef4444);
+  background-attachment: fixed;
+  color: #f8fafc;
+  text-align: center;
+  min-height: 100vh;
+}
+
+/* BACK BUTTON */
+.back-btn {
+  position: fixed;
+  top: 20px; left: 20px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  border:1px solid rgba(255,255,255,0.2);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+}
+.back-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* VIEW LABEL */
+.view-label {
+  position: fixed;
+  top: 20px; right: 20px;
+  background: #0ea5e9;
+  padding: 10px 16px;
+  font-weight: 700;
+  border-radius: 8px;
+  color: #fff;
+  z-index: 9999;
+  box-shadow:0 4px 12px rgba(0,0,0,0.3);
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 25px;
+  margin-top: 80px;
+  flex-wrap: wrap;
+}
+
+.card {
+  background: rgba(17,24,39,0.85);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  min-width: 300px;
+}
+
+canvas {
+  border-radius: 16px;
+  transform: scaleX(-1);
+}
+
+#feedback {
+  font-size:1.3rem;
+  margin-top:15px;
+  font-weight:bold;
+  min-height:50px;
+
+  display: -webkit-box;
+  display: box; /* fallback */
+  -webkit-box-orient: vertical;
+  box-orient: vertical;
+
+  -webkit-line-clamp: 2;
+  line-clamp: 2; /* <-- This removes VS Code warning */
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#statusLight {
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 10px;
+  background-color: gray;
+}
+
+button {
+  background-color:#10b981;
+  color:white;
+  padding:10px 20px;
+  border:none;
+  border-radius:10px;
+  font-size:1rem;
+  cursor:pointer;
+  margin:5px;
+}
+button:disabled { background-color:#6b7280; cursor:not-allowed; }
+
+#accuracyCard {
+  background: rgba(34,197,94,0.1);
+  border: 2px solid #22c55e;
+  border-radius: 12px;
+  padding: 15px;
+  text-align:center;
+  margin-top:15px;
+}
+
+.score-list {
+  margin-top: 15px;
+  text-align:left;
+  font-size:0.9rem;
+}
+.score-list div {
+  padding: 6px 0;
+  border-bottom:1px solid rgba(255,255,255,0.15);
+}
+</style>
+</head>
+
+<body>
+
+<div class="back-btn" onclick="location.href='advance_home.html'">← Back</div>
+<div class="view-label">Side View</div>
+
+<h1>🏋️‍♂️ Intermediate Squat Posture Trainer</h1>
+
+<div class="container">
+  <div class="card">
+    <canvas id="output" width="640" height="480"></canvas>
+  </div>
+
+  <div class="card" style="text-align:left;">
+    <h2>Live Feedback</h2>
+    <div id="feedback">Click START to begin</div>
+    <div id="counter"><b>Reps:</b> 0 / 5</div>
+    <div><b>Status:</b> <span id="statusLight"></span></div>
+
+    <div id="accuracyCard">
+      <h3>🏁 Workout Summary</h3>
+      <p id="accuracy"></p>
+
+      <h4 style="color:#a7f3d0;margin-top:15px;">Last 5 Scores</h4>
+      <div id="scoreList" class="score-list"></div>
+
+      <button id="startBtn">START</button>
+      <button id="resetBtn" disabled>RESET</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------- AUTH CHECK ---------------- */
+const currentUserId = localStorage.getItem("current_user_id");
+if (!currentUserId) location.href="../login.html";
+
+const exerciseId = 23;
+
+/* ---------------- SETUP ---------------- */
+const canvas = document.getElementById("output");
+const ctx = canvas.getContext("2d");
+
+const feedback = document.getElementById("feedback");
+const counter = document.getElementById("counter");
+const accuracy = document.getElementById("accuracy");
+const scoreList = document.getElementById("scoreList");
+
+const startBtn = document.getElementById("startBtn");
+const resetBtn = document.getElementById("resetBtn");
+const statusLight = document.getElementById("statusLight");
+
+const video = document.createElement("video");
+video.width = 640; video.height = 480;
+video.autoplay = true; video.muted = true; video.playsInline = true;
+
+let started = false;
+let repCount = 0;
+let goingDown = false;
+
+let goodFrames = 0;
+let totalFrames = 0;
+let posturePenalty = 0;
+
+const targetReps = 5;
+
+/* ------------- LOAD LAST 5 SCORES --------------- */
+async function loadScores() {
+  const res = await fetch(`/api/accuracy/user/${currentUserId}/exercise/${exerciseId}`);
+  if (!res.ok) return;
+
+  const data = await res.json();
+  scoreList.innerHTML = "";
+
+  if (data.length === 0) {
+    scoreList.innerHTML = "<div>No previous scores</div>";
+    return;
+  }
+
+  data.forEach(row => {
+    scoreList.innerHTML += `<div>⭐ ${row.posture_accuracy}% — ${row.date.replace("T", " ")}</div>`;
+  });
+}
+
+loadScores();
+
+/* ------------- ANGLE FUNCTION --------------- */
+function calculateAngle(a,b,c){
+  const radians = Math.atan2(c.y-b.y, c.x-b.x) - Math.atan2(a.y-b.y, a.x-b.x);
+  let angle = Math.abs(radians * 180 / Math.PI);
+  if(angle > 180) angle = 360 - angle;
+  return angle;
+}
+
+/* ------------- ON RESULTS (UNCHANGED LOGIC) --------------- */
+function onResults(results){
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
+
+  if(results.poseLandmarks){
+    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {color:'#00ffcc',lineWidth:4});
+    drawLandmarks(ctx, results.poseLandmarks, {color:'#ff006e',radius:4});
+
+    if(started && repCount < targetReps){
+
+      let goodPosture = true;
+      let messages = [];
+      const lm = results.poseLandmarks;
+
+      const rk = calculateAngle(lm[24], lm[26], lm[28]);
+      const lk = calculateAngle(lm[23], lm[25], lm[27]);
+      const avgKnee = (rk + lk) / 2;
+      const forwardLean = calculateAngle(lm[12], lm[24], lm[28]);
+
+      /* ---- ORIGINAL LOGIC / MESSAGES UNCHANGED ---- */
+      if(forwardLean < 50){
+        goodPosture = false;
+        messages.push("Try not to lean too far forward.");
+      }
+      if(avgKnee > 110 && avgKnee < 160){
+        goodPosture = false;
+        messages.push("Go a little deeper for full squat range.");
+      }
+      else if(avgKnee < 90){
+        goodPosture = false;
+        messages.push("That’s too low — don’t over-bend your knees!");
+      }
+
+      if(avgKnee < 110 && !goingDown){
+        goingDown = true;
+        feedback.innerText = '⬇️ Lower down — nice and controlled!';
+      }
+      else if(avgKnee > 140 && goingDown){
+        goingDown = false;
+        repCount++;
+        feedback.innerText = `⬆️ Great! That’s rep ${repCount}! Keep it up 🔥`;
+        counter.innerHTML = `<b>Reps:</b> ${repCount} / ${targetReps}`;
+      }
+
+      if(!goodPosture){
+        feedback.innerText = messages.join(" | ");
+        statusLight.style.backgroundColor = 'orange';
+        posturePenalty++;
+      } else {
+        feedback.innerText = "Nice form — keep moving!";
+        statusLight.style.backgroundColor = 'limegreen';
+      }
+
+      totalFrames++;
+      if(goodPosture) goodFrames++;
+
+      if(repCount >= targetReps) finishWorkout();
+    }
+  }
+
+  ctx.restore();
+}
+
+/* ------------- FINISH WORKOUT --------------- */
+async function finishWorkout(){
+  started = false;
+  startBtn.disabled = true;
+  resetBtn.disabled = false;
+
+  const raw = (goodFrames / totalFrames) * 100;
+  const penalty = Math.min(25, (posturePenalty / totalFrames) * 100);
+  const acc = Math.max(40, (raw - penalty).toFixed(1));
+
+  feedback.innerText = '🏁 Great work! Squats complete 👏';
+  accuracy.innerHTML = `<b>Posture Accuracy:</b> ${acc}%`;
+  statusLight.style.backgroundColor = 'gold';
+
+  /* ---- SAVE ACCURACY ---- */
+  await fetch("/api/accuracy/save", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      userId: currentUserId,
+      exerciseId: exerciseId,
+      postureAccuracy: parseFloat(acc)
+    })
+  });
+
+  loadScores();
+}
+
+/* ------------- BUTTONS --------------- */
+startBtn.onclick = ()=>{
+  started = true;
+  repCount = 0;
+  goingDown = false;
+  goodFrames = 0;
+  totalFrames = 0;
+  posturePenalty = 0;
+
+  feedback.innerText = '⬇️ Lower down — nice and controlled!';
+  startBtn.disabled = true;
+  resetBtn.disabled = false;
+  counter.innerHTML = `<b>Reps:</b> 0 / ${targetReps}`;
+  statusLight.style.backgroundColor = 'limegreen';
+};
+
+resetBtn.onclick = ()=>{
+  started = false;
+  repCount = 0;
+  goingDown = false;
+  goodFrames = 0;
+  totalFrames = 0;
+  posturePenalty = 0;
+
+  feedback.innerText = '🔁 Ready for your next set!';
+  counter.innerHTML = `<b>Reps:</b> 0 / ${targetReps}`;
+  startBtn.disabled = false;
+  resetBtn.disabled = true;
+  accuracy.innerText = '';
+  statusLight.style.backgroundColor = 'gray';
+};
+
+/* ------------- CAMERA + MEDIAPIPE --------------- */
+const pose = new Pose({
+  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`
+});
+pose.setOptions({
+  modelComplexity:1,
+  smoothLandmarks:true,
+  minDetectionConfidence:0.4,
+  minTrackingConfidence:0.4
+});
+pose.onResults(onResults);
+
+const camera = new Camera(video, {
+  onFrame:async()=>{await pose.send({image:video});},
+  width:640, height:480
+});
+
+camera.start().catch(err=>{
+  feedback.innerText='⚠️ Please allow camera access!';
+  console.error(err);
+});
+</script>
+<script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/09/12/13/20250912131740-W10O18WN.js" defer></script>
+</body>
+</html>

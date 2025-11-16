@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Workout Assistant — Home</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-1:#0f1440;--muted:rgba(255,255,255,0.75);--border:rgba(255,255,255,0.08);
+  --accent:linear-gradient(90deg,#5eead4,#60a5fa);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:'Inter',sans-serif;color:#f8fafc;
+  background:linear-gradient(180deg,var(--bg-1),#241647);min-height:100vh;padding:20px;
+  display:flex;justify-content:center;
+}
+.app{display:grid;grid-template-columns:260px 1fr;gap:18px;width:100%;max-width:1500px;}
+.sidebar{
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  border-radius:14px;padding:20px;backdrop-filter:blur(8px);
+}
+.logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#60a5fa,#7c3aed);
+  display:grid;place-items:center;font-weight:800;}
+.brand{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+.subtitle{color:var(--muted);font-size:0.85rem}
+.current-mode{margin-top:10px;padding:8px 10px;background:rgba(255,255,255,0.04);
+  border-radius:8px;font-weight:600;}
+.groups{margin-top:18px}
+.group-item{padding:10px;border-radius:8px;color:var(--muted);cursor:pointer;margin-bottom:6px}
+.group-item:hover,.group-item.active{background:rgba(255,255,255,0.05);color:#fff;font-weight:700}
+.content{
+  border-radius:14px;border:1px solid var(--border);backdrop-filter:blur(6px);
+  background:rgba(255,255,255,0.02);padding:22px;
+}
+.content-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;position:relative}
+.dropdown{position:relative;}
+.dropdown-btn{
+  background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
+  padding:8px 14px;border-radius:8px;color:var(--muted);font-weight:700;cursor:pointer;
+}
+.dropdown-btn:hover{background:rgba(255,255,255,0.08);}
+.dropdown-menu{
+  position:absolute;right:0;top:110%;background:rgba(17,25,40,0.95);
+  border:1px solid rgba(255,255,255,0.1);border-radius:8px;display:none;flex-direction:column;
+  min-width:160px;z-index:20;
+}
+.dropdown-menu button{
+  background:none;border:0;color:#fff;padding:10px 14px;text-align:left;cursor:pointer;
+}
+.dropdown-menu button:hover{background:rgba(255,255,255,0.08);}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:1200px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:800px){.app{grid-template-columns:1fr}.grid{grid-template-columns:1fr}}
+.ex-card{border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:14px;background:rgba(255,255,255,0.02);
+  display:flex;flex-direction:column;gap:10px}
+.thumb{height:130px;border-radius:8px;background:linear-gradient(135deg,#111827,#1f2937);
+  display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted);}
+.btn{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;font-weight:700}
+.btn.primary{background:linear-gradient(90deg,#60a5fa,#a78bfa);color:#041026}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.1);color:var(--muted)}
+.back-btn{margin-bottom:14px;display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);
+  padding:8px 12px;border-radius:999px;cursor:pointer;color:var(--muted);}
+.exercise-frame{width:100%;height:85vh;border:none;border-radius:12px;background:#000;}
+.logout-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+.logout-btn {
+  width: 70%;
+  padding: 10px 14px;
+  text-align: center;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(90deg, #ff6b6b, #ff8e53);
+  color: #1b0f1f;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+  transition: 0.25s ease;
+}
+
+.logout-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(255, 107, 107, 0.35);
+}
+
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">AW</div>
+      <div>
+        <h2 style="margin:0;font-size:1rem;">AI Workout Assistant</h2>
+        <div class="subtitle">Integrated Home</div>
+      </div>
+    </div>
+    <div class="current-mode" id="sidebarMode">Mode: Beginner</div>
+    <nav class="groups" id="groups"></nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="content">
+    <div class="content-header">
+      <div>
+        <div style="color:var(--muted)">Welcome back, <strong id="usernameDisplay"></strong></div>
+        <div style="font-size:1.2rem;font-weight:800;">Choose a workout</div>
+      </div>
+      <div class="dropdown" id="modeDropdown">
+        <button class="dropdown-btn" id="dropdownBtn">Mode: Beginner ▾</button>
+        <div class="dropdown-menu" id="dropdownMenu">
+          <button data-mode="beginner">Beginner</button>
+          <button data-mode="intermediate">Intermediate</button>
+          <button data-mode="advanced">Advanced</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="contentBody">
+      <div style="color:var(--muted);font-size:1rem;">Select a category on the left to view exercises.</div>
+    </div>
+  </main>
+</div>
+
+<script>
+  let lastOpenedGroup = null;
+// --- Existing beginner exercise data unchanged ---
+const BEGINNER_EXERCISES = {
+  "Arms & Chest": [
+    {id:"lateralrises",title:"Lateral Raises"},
+    {id:"jumpingjacks",title:"Jumping Jacks"},
+    {id:"shouldercircle",title:"Shoulder Circles"},
+    {id:"normalpushup",title:"Push Ups"},
+    {id:"inclinedpushups",title:"Inclined Push Ups"},
+    {id:"declinepushups",title:"Declined Push Ups"},
+    {id:"diamondpushups",title:"Diamond Push Ups"},
+    {id:"widegrippushups",title:"Wide Grip Push Ups"},
+    {id:"lsit",title:"L-Sit Hold"},
+    {id:"supermanpull",title:"Superman Pull"}
+  ],
+  "Abs": [
+    {id:"plank",title:"Plank"},
+    {id:"bicyclecrunches",title:"Bicycle Crunches"},
+    {id:"lyinglegrises",title:"Lying Leg Raises"},
+    {id:"russiantwists",title:"Russian Twists"},
+    {id:"sidecrunches",title:"Side Crunches"},
+    {id:"kneelyingtwist",title:"Kneelying Twist"},
+    {id:"standingtoe",title:"Standing Toe Touches"},
+    {id:"supermanhold",title:"Superman Hold"}
+  ],
+  "Legs": [
+    {id:"bodyweightsquats",title:"Squats"},
+    {id:"calfraises",title:"Calf Raises"},
+    {id:"curtsylunges",title:"Lunges"},
+    {id:"resistglut",title:"Resisted Glute Bridges"},
+    {id:"jumpsquats",title:"Jump Squats"},
+    {id:"bicycleair",title:"Bicycle Air"},
+    {id:"standingbow",title:"Standing Bow Pose"},
+    {id:"extendedsideangle",title:"Extended Side Angle Pose"}
+  ]
+};
+
+let currentExercises = BEGINNER_EXERCISES;
+
+const groupsEl = document.getElementById("groups");
+const contentBody = document.getElementById("contentBody");
+const sidebarMode = document.getElementById("sidebarMode");
+const dropdownBtn = document.getElementById("dropdownBtn");
+const dropdownMenu = document.getElementById("dropdownMenu");
+
+const MODE_KEY = "aw_mode";
+
+// Build sidebar groups
+function buildSidebar() {
+  groupsEl.innerHTML = "";
+
+  Object.keys(currentExercises).forEach(group => {
+    const div = document.createElement("div");
+    div.className = "group-item";
+    div.textContent = group;
+    div.onclick = () => showGrid(group);
+    groupsEl.appendChild(div);
+  });
+
+  // --- Centered Stylish Logout Button ---
+  const logoutContainer = document.createElement("div");
+  logoutContainer.className = "logout-container";
+
+  const logoutBtn = document.createElement("div");
+  logoutBtn.className = "logout-btn";
+  logoutBtn.textContent = "Logout";
+  logoutBtn.onclick = () => window.location.href = "logout.html";
+
+  logoutContainer.appendChild(logoutBtn);
+  groupsEl.appendChild(logoutContainer);
+}
+
+
+
+// Open/close mode dropdown
+dropdownBtn.onclick = () => {
+  dropdownMenu.style.display = dropdownMenu.style.display === "flex" ? "none" : "flex";
+  dropdownMenu.style.flexDirection = "column";
+};
+
+document.addEventListener("click", e => {
+  if (!e.target.closest("#modeDropdown")) dropdownMenu.style.display = "none";
+});
+
+// Mode selection buttons
+dropdownMenu.querySelectorAll("button").forEach(btn => {
+  btn.onclick = () => {
+    setMode(btn.dataset.mode);
+    dropdownMenu.style.display = "none";
+  };
+});
+
+// -------------------------
+//        MODE LOGIC
+// -------------------------
+function setMode(mode) {
+  localStorage.setItem(MODE_KEY, mode);
+
+  dropdownBtn.textContent = "Mode: " + mode.charAt(0).toUpperCase() + mode.slice(1) + " ▾";
+  sidebarMode.textContent = "Mode: " + mode.charAt(0).toUpperCase() + mode.slice(1);
+
+  if (mode === "intermediate") {
+    window.location.href = "/Intermediate/intermediate_home.html";
+    return;
+  }
+
+  if (mode === "advanced") {
+    window.location.href = "/Advance/advance_home.html";
+    return;
+  }
+
+  // Beginner mode
+  currentExercises = BEGINNER_EXERCISES;
+  buildSidebar();
+  contentBody.innerHTML =
+    `<div style="color:var(--muted);font-size:1rem;">Select a category on the left to view exercises.</div>`;
+}
+
+// -------------------------
+// SAFE LOAD MODE (NO REDIRECT)
+// -------------------------
+// Force beginner mode on first load after login
+let savedMode = localStorage.getItem(MODE_KEY);
+
+if (!savedMode) {
+  savedMode = "beginner";
+  localStorage.setItem(MODE_KEY, "beginner");
+}
+
+
+// Just update UI – do NOT redirect
+dropdownBtn.textContent = "Mode: " + savedMode.charAt(0).toUpperCase() + savedMode.slice(1) + " ▾";
+sidebarMode.textContent = "Mode: " + savedMode.charAt(0).toUpperCase() + savedMode.slice(1);
+
+if (savedMode === "beginner") {
+  currentExercises = BEGINNER_EXERCISES;
+  buildSidebar();
+  contentBody.innerHTML =
+    `<div style="color:var(--muted);font-size:1rem;">Select a category on the left to view exercises.</div>`;
+}
+
+// Show exercises when clicking left sidebar
+function showGrid(group) {
+  lastOpenedGroup = group;  // remember which group was opened
+
+  const list = currentExercises[group];
+  contentBody.innerHTML = `
+    <h3 style="margin-bottom:10px">${group} Workouts</h3>
+    <div class="grid">
+      ${list.map(ex => `
+        <div class="ex-card">
+          <div class="thumb">${ex.title}</div>
+          <button class="btn primary" onclick="openExercise('${ex.id}','${ex.title}')">View</button>
+        </div>`).join("")}
+    </div>`;
+}
+
+
+// Load exercise page inside iframe
+function openExercise(id, title) {
+  const filePath = `Beginner/${id}.html`;
+  contentBody.innerHTML = `
+    <button class="back-btn" onclick="goBack()">Back to Workouts</button>
+    <iframe class="exercise-frame" src="${filePath}"></iframe>
+  `;
+}
+
+function goBack() {
+  if (lastOpenedGroup) {
+    showGrid(lastOpenedGroup);
+  } else {
+    contentBody.innerHTML =
+      `<div style="color:var(--muted);font-size:1rem;">Select a category on the left to view exercises.</div>`;
+  }
+}
+
+</script>
+
+<script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/09/12/13/20250912131740-W10O18WN.js" defer></script>
+<script>
+  // 🔒 AUTH CHECK
+  const userId = localStorage.getItem("current_user_id");
+  const userName = localStorage.getItem("current_user_name");
+
+  if (!userId || !userName) {
+    // User is NOT logged in → redirect to login page
+    window.location.href = "login.html";
+  }
+
+  // 👤 SHOW USER NAME ON HOME PAGE
+  document.getElementById("usernameDisplay").textContent = userName;
+</script>
+
+
+</body>
+</html>

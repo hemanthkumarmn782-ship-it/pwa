@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitnessHub | Login</title>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      background: linear-gradient(135deg, #f3f8ff, #e2ecf9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: white;
+      padding: 40px 30px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      width: 380px;
+      transition: all 0.3s ease;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 25px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+      font-size: 15px;
+    }
+
+    input:focus {
+      border-color: #5c7cfa;
+      box-shadow: 0 0 5px rgba(92, 124, 250, 0.3);
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #5c7cfa;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #4a63d1;
+    }
+
+    p {
+      text-align: center;
+      margin-top: 15px;
+      color: #555;
+    }
+
+    a {
+      color: #5c7cfa;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container" id="loginContainer">
+    <h2>Welcome !</h2>
+    <input type="email" id="loginEmail" placeholder="Email" required />
+    <input type="password" id="loginPassword" placeholder="Password" required />
+    <button onclick="loginUser()">Login</button>
+    <p>Don’t have an account? <a href="#" onclick="toggleForm()">Register</a></p>
+  </div>
+
+  <div class="container hidden" id="registerContainer">
+    <h2>Create Account</h2>
+    <input type="text" id="fullName" placeholder="Full Name" required />
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <input type="number" id="age" placeholder="Age (optional)" />
+    <input type="text" id="gender" placeholder="Gender (optional)" />
+    <input type="number" id="height" placeholder="Height (cm)" />
+    <input type="number" id="weight" placeholder="Weight (kg)" />
+    <button onclick="registerUser()">Register</button>
+    <p>Already registered? <a href="#" onclick="toggleForm()">Login</a></p>
+  </div>
+
+  <script>
+    const backendUrl = "http://localhost:8080/api/users";
+
+    function toggleForm() {
+      document.getElementById("loginContainer").classList.toggle("hidden");
+      document.getElementById("registerContainer").classList.toggle("hidden");
+    }
+
+    // ---- LOGIN ----
+    async function loginUser() {
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
+
+  if (!email || !password) {
+    alert("Please enter both email and password.");
+    return;
+  }
+
+  try {
+    const response = await fetch("http://localhost:8080/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json();
+
+    if (data.status === "success") {
+
+      // Save user details
+      localStorage.setItem("current_user_id", data.user_id);
+      localStorage.setItem("current_user_name", data.full_name);
+      localStorage.setItem("current_user_email", data.email);
+
+      window.location.href = "home.html";
+    } else {
+      alert(data.message); // error message
+    }
+
+  } catch (err) {
+    alert("Server error. Try again later.");
+  }
+}
+    // ---- REGISTER ----
+    async function registerUser() {
+      const user = {
+        full_name: document.getElementById("fullName").value,
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value,
+        age: parseInt(document.getElementById("age").value || 0),
+        gender: document.getElementById("gender").value,
+        height_cm: parseInt(document.getElementById("height").value || 0),
+        weight_kg: parseInt(document.getElementById("weight").value || 0),
+      };
+
+      if (!user.full_name || !user.email || !user.password) {
+        alert("Full Name, Email, and Password are required.");
+        return;
+      }
+
+      try {
+        const existingUsersRes = await fetch(`${backendUrl}/all`);
+        const existingUsers = await existingUsersRes.json();
+        const userExists = existingUsers.some(u => u.email === user.email);
+
+        if (userExists) {
+          alert("Email already registered. Please login instead.");
+          toggleForm();
+          return;
+        }
+
+        const res = await fetch(`${backendUrl}/add`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(user)
+        });
+
+        if (res.ok) {
+          toggleForm(); // switch to login
+        } else {
+          alert("Registration failed. Try again.");
+        }
+
+      } catch (e) {
+        alert("Server error during registration.");
+      }
+    }
+  </script>
+</body>
+</html>

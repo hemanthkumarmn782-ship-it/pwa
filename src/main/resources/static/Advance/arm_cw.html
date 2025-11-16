@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Arm Circles (Clockwise)</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js"></script>
+
+<style>
+body{
+  margin:0;padding:0;font-family:'Segoe UI',Arial;
+  background:linear-gradient(to bottom right,#1e3a8a,#9333ea,#ef4444);
+  color:#f8fafc;text-align:center;min-height:100vh;position:relative;
+}
+.top-info{
+  position:absolute;top:10px;right:15px;
+  background:rgba(0,0,0,0.4);
+  padding:8px 14px;border-radius:10px;
+  font-size:1rem;font-weight:700;
+}
+.back-btn{
+  position:absolute;top:10px;left:15px;
+  background:rgba(255,255,255,0.15);
+  padding:8px 14px;border-radius:10px;font-weight:700;
+  cursor:pointer;
+}
+.container{
+  display:flex;justify-content:center;align-items:flex-start;
+  gap:25px;margin-top:60px;flex-wrap:wrap;
+}
+.card{
+  background:rgba(17,24,39,0.85);border-radius:16px;
+  padding:20px;box-shadow:0 4px 20px rgba(0,0,0,0.4);min-width:300px;
+}
+canvas{border-radius:16px;transform:scaleX(-1);}
+#feedback{
+  font-size:1.3rem;margin-top:15px;font-weight:bold;min-height:50px;
+  display:-webkit-box;display:box;
+  -webkit-box-orient:vertical;box-orient:vertical;
+  -webkit-line-clamp:2;line-clamp:2;
+  overflow:hidden;text-overflow:ellipsis;
+}
+button{
+  background-color:#10b981;color:white;padding:10px 20px;
+  border:none;border-radius:10px;font-size:1rem;
+  cursor:pointer;margin:5px;
+}
+button:disabled{background-color:#6b7280;}
+#statusLight{
+  width:15px;height:15px;border-radius:50%;display:inline-block;
+  margin-left:10px;background-color:gray;
+}
+#accuracyCard{
+  background:rgba(34,197,94,0.1);border:2px solid #22c55e;
+  border-radius:12px;padding:15px;margin-top:15px;text-align:center;
+}
+#historyBox{
+  margin-top:20px;padding:15px;
+  background:rgba(0,0,0,0.35);
+  border-radius:14px;
+  text-align:left;
+}
+</style>
+</head>
+
+<body>
+
+<!-- BACK BUTTON -->
+<div class="back-btn" onclick="location.href='../Advance/advance_home.html'">⬅ Back</div>
+
+<!-- VIEW INDICATOR -->
+<div class="top-info">📷 Front View</div>
+
+<h1>🌀 Arm Circles Trainer (Clockwise)</h1>
+
+<div class="container">
+
+  <!-- Camera -->
+  <div class="card">
+    <canvas id="output" width="640" height="480"></canvas>
+  </div>
+
+  <!-- Feedback -->
+  <div class="card" style="text-align:left;">
+    <h2>Live Feedback</h2>
+    <div id="feedback">Click START to begin</div>
+
+    <div id="counter"><b>Circles:</b> 0 / 5</div>
+    <div><b>Status:</b> <span id="statusLight"></span></div>
+
+    <div id="accuracyCard">
+      <h3>🏁 Workout Summary</h3>
+      <p id="accuracy"></p>
+
+      <button id="startBtn">START</button>
+      <button id="resetBtn" disabled>RESET</button>
+    </div>
+
+    <!-- LAST 5 ACCURACY SCORES -->
+    <div id="historyBox">
+      <h3>📊 Last 5 Accuracy Scores</h3>
+      <ul id="historyList" style="padding-left:18px;"></ul>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+/* ------------------------------------------------------
+   PAGE AUTHENTICATION
+------------------------------------------------------ */
+const userId = localStorage.getItem("current_user_id");
+if (!userId) {
+  window.location.href = "../login.html";
+}
+const exerciseId = 2; // arm_cw = 2
+
+/* ------------------------------------------------------
+   Setup (ORIGINAL CODE – UNMODIFIED)
+------------------------------------------------------ */
+const canvas = document.getElementById("output");
+const ctx = canvas.getContext("2d");
+
+const feedback = document.getElementById("feedback");
+const counter = document.getElementById("counter");
+const accuracy = document.getElementById("accuracy");
+
+const startBtn = document.getElementById("startBtn");
+const resetBtn = document.getElementById("resetBtn");
+const statusLight = document.getElementById("statusLight");
+const historyList = document.getElementById("historyList");
+
+const video = document.createElement("video");
+video.width = 640; video.height = 480; video.autoplay = true;
+video.muted = true; video.playsInline = true;
+
+let started = false;
+let circles = 0;
+let phase = 0;
+let goodFrames = 0, totalFrames = 0;
+const target = 5;
+
+/* angle function (UNCHANGED) */
+function angle(a,b,c){
+  const r = Math.atan2(c.y-b.y,c.x-b.x) - Math.atan2(a.y-b.y,a.x-b.x);
+  let deg = Math.abs(r * 180 / Math.PI);
+  return deg > 180 ? 360-deg : deg;
+}
+
+/* ------------------------------------------------------
+   SAVE ACCURACY TO BACKEND
+------------------------------------------------------ */
+async function saveAccuracy(acc){
+  try{
+    await fetch("http://localhost:8080/api/accuracy/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: parseInt(userId),
+        exercise_id: exerciseId,
+        posture_accuracy: acc
+      })
+    });
+  }catch(e){
+    console.error("Save Error:", e);
+  }
+}
+
+
+/* ------------------------------------------------------
+   LOAD LAST 5 SCORES
+------------------------------------------------------ */
+async function loadHistory(){
+  historyList.innerHTML = "<li>Loading...</li>";
+
+  try{
+    const res = await fetch(`http://localhost:8080/api/accuracy/recent/${userId}/${exerciseId}`);
+    const list = await res.json();
+
+    historyList.innerHTML = "";
+
+    if(!list || list.length === 0){
+      historyList.innerHTML = "<li>No previous scores</li>";
+      return;
+    }
+
+    list.forEach(i => {
+
+      // Correct fields coming from backend
+      const accVal = i.posture_accuracy;
+
+      // Format date nicely
+      const dateVal = new Date(i.date).toLocaleString("en-IN", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+
+      const li = document.createElement("li");
+      li.textContent = `${accVal}% on ${dateVal}`;
+      historyList.appendChild(li);
+    });
+
+  }catch(e){
+    console.error(e);
+    historyList.innerHTML = "<li>Error loading history</li>";
+  }
+}
+loadHistory();
+
+/* ------------------------------------------------------
+   Pose Processing (UNCHANGED)
+------------------------------------------------------ */
+function onResults(res){
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(res.image,0,0,canvas.width,canvas.height);
+
+  if(!res.poseLandmarks){
+    ctx.restore(); return;
+  }
+
+  drawConnectors(ctx,res.poseLandmarks,POSE_CONNECTIONS,{color:"#00FFCC",lineWidth:4});
+  drawLandmarks(ctx,res.poseLandmarks,{color:"#FF006E",radius:4});
+
+  if(started && circles < target){
+    const lm = res.poseLandmarks;
+
+    const shoulder = lm[11];
+    const elbow    = lm[13];
+    const wrist    = lm[15];
+
+    const elbowAngle = angle(shoulder, elbow, wrist);
+    const hip = lm[23], knee = lm[25];
+    const backAngle = angle(shoulder, hip, knee);
+
+    totalFrames++;
+
+    let messages = [];
+    let postureOK = true;
+
+    if(elbowAngle < 150){
+      postureOK = false; messages.push("Keep your arm straight!");
+    }
+    if(backAngle < 145){
+      postureOK = false; messages.push("Keep your back straight!");
+    }
+    if(shoulder.y > hip.y - 0.05){
+      postureOK = false; messages.push("Lift your shoulders a bit.");
+    }
+
+    statusLight.style.backgroundColor = postureOK ? "limegreen" : "red";
+
+    if(!postureOK){
+      feedback.innerText = messages.join(" | ");
+    } else {
+      feedback.innerText = "Nice form — keep rotating!";
+      goodFrames++;
+    }
+
+    const dx = wrist.x - shoulder.x;
+    const dy = wrist.y - shoulder.y;
+
+    if(dx > 0.12 && Math.abs(dy) < 0.10 && phase === 0){
+      phase = 1; feedback.innerText = "➡️ Arm moving right";
+    }
+    else if(dy > 0.15 && phase === 1){
+      phase = 2; feedback.innerText = "⬇️ Arm moving down";
+    }
+    else if(dx > 0.12 && dy < 0.05 && phase === 2){
+      phase = 0;
+      circles++;
+      counter.innerHTML = `<b>Circles:</b> ${circles} / ${target}`;
+      feedback.innerText = `✅ Circle ${circles} completed! Great job!`;
+    }
+
+    if(circles >= target) finish();
+  }
+
+  ctx.restore();
+}
+
+/* ------------------------------------------------------
+   FINISH (with saving to DB)
+------------------------------------------------------ */
+function finish(){
+  started = false;
+  startBtn.disabled = true;
+  resetBtn.disabled = false;
+
+  const acc = ((goodFrames / totalFrames) * 100).toFixed(1);
+
+  feedback.innerText = "🏁 Great work! Circles complete!";
+  accuracy.innerHTML = `<b>Form Accuracy:</b> ${acc}%`;
+  statusLight.style.backgroundColor = "gold";
+
+  saveAccuracy(acc);
+  loadHistory();
+}
+
+/* ------------------------------------------------------
+   Start & Reset (UNCHANGED)
+------------------------------------------------------ */
+startBtn.onclick = ()=>{
+  started = true; circles = 0; phase = 0;
+  goodFrames = 0; totalFrames = 0;
+
+  startBtn.disabled = true;
+  resetBtn.disabled = false;
+
+  feedback.innerText = "🔄 Start rotating clockwise!";
+  counter.innerHTML = `<b>Circles:</b> 0 / ${target}`;
+  statusLight.style.backgroundColor = "limegreen";
+};
+
+resetBtn.onclick = ()=>{
+  started = false; circles = 0; phase = 0;
+  goodFrames = 0; totalFrames = 0;
+
+  startBtn.disabled = false;
+  resetBtn.disabled = true;
+
+  feedback.innerText = "🔁 Ready to begin!";
+  counter.innerHTML = `<b>Circles:</b> 0 / ${target}`;
+  accuracy.innerText = "";
+  statusLight.style.backgroundColor = "gray";
+};
+
+/* ------------------------------------------------------
+   Pose + Camera
+------------------------------------------------------ */
+const pose = new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5/${f}`});
+pose.setOptions({
+  modelComplexity:1,
+  smoothLandmarks:true,
+  enableSegmentation:false,
+  minDetectionConfidence:0.5,
+  minTrackingConfidence:0.5
+});
+pose.onResults(onResults);
+
+const camera = new Camera(video,{
+  onFrame: async()=>{ await pose.send({image:video}); },
+  width:640, height:480
+});
+camera.start().catch(err=>{
+  feedback.innerText = "⚠️ Please allow camera access!";
+  console.error(err);
+});
+</script>
+<script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
+<script src="https://files.bpcontent.cloud/2025/09/12/13/20250912131740-W10O18WN.js" defer></script>
+</body>
+</html>

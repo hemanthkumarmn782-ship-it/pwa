@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Plan Details</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background:#f5f5f5;
+            padding:30px;
+        }
+        h1{
+            color:#333;
+        }
+        .exercise-card{
+            background:white;
+            margin:15px 0;
+            padding:15px;
+            border-radius:10px;
+            box-shadow:0px 0px 5px rgba(0,0,0,0.2);
+        }
+        img{
+            width:200px;
+            height:auto;
+            border-radius:10px;
+            margin-top:10px;
+        }
+        .phase{
+            font-size:14px;
+            color:#555;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Workout Plan Details</h1>
+<div id="exerciseList"></div>
+
+<script>
+// Read planId from URL
+const urlParams = new URLSearchParams(window.location.search);
+const planId = urlParams.get("planId");
+
+function loadPlanDetails(){
+    fetch("http://localhost:8080/api/intermediate/getPlanDetails/" + planId)
+    .then(res => res.json())
+    .then(result => {
+
+    console.log("API Response:", result);  // DEBUG LINE
+
+    const container = document.getElementById("exerciseList");
+    container.innerHTML = "";
+
+    // If backend returned an object instead of a list
+    if (!Array.isArray(result)) {
+        container.innerHTML = 
+            "<b>Backend did not return a list.</b><br><br>Actual response:<br>" +
+            JSON.stringify(result, null, 2);
+        return;
+    }
+
+    // Now treat result as exercises list
+    const exercises = result;
+
+    exercises.forEach(ex => {
+        const div = document.createElement("div");
+        div.className = "exercise-card";
+        div.innerHTML = `
+            <h3>${ex.order_no}. ${ex.exercise_name}</h3>
+            <div class="phase">Phase: ${ex.phase}</div>
+            <div>Sets: ${ex.sets}</div>
+            <div>Reps: ${ex.reps}</div>
+            <img src="${ex.gif_path}" alt="${ex.exercise_name}">
+        `;
+        container.appendChild(div);
+    });
+})
+
+    .catch(err => {
+        document.getElementById("exerciseList").innerText = 
+           "Error loading plan details: " + err;
+    });
+}
+
+loadPlanDetails();
+</script>
+
+</body>
+</html>

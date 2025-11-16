@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Workout Plan</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            background: #f5f5f5;
+        }
+        h1{color:#333;}
+        button{
+            padding:10px 20px;
+            margin:10px;
+            font-size:16px;
+            background:#007bff;
+            color:white;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+        }
+        button:hover{background:#0056b3;}
+        select{
+            padding:10px;
+            margin:10px 0;
+            font-size:16px;
+        }
+        #result{
+            margin-top:20px;
+            padding:15px;
+            background:white;
+            border-radius:8px;
+            box-shadow:0 0 5px rgba(0,0,0,0.1);
+            white-space:pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>Generate Intermediate Workout Plan</h1>
+
+<label>Select Category:</label><br>
+<select id="categorySelect">
+    <option value="Full Body">Full Body</option>
+    <option value="Arms & Chest">Arms & Chest</option>
+    <option value="Abs">Abs</option>
+    <option value="Legs">Legs</option>
+</select>
+
+<br><br>
+
+<button onclick="generatePlan('weekly')">Generate Weekly Plan</button>
+<button onclick="generatePlan('monthly')">Generate Monthly Plan</button>
+
+<div id="result"></div>
+
+<script>
+function generatePlan(period){
+    const category = document.getElementById("categorySelect").value;
+
+    fetch("http://localhost:8080/api/intermediate/generatePlan", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+            user_id: 1,
+            period: period,
+            categories: [category]
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById("result").innerText = 
+            "Plan Generated Successfully!\n\n" + JSON.stringify(data, null, 2);
+    })
+    .catch(err=>{
+        document.getElementById("result").innerText = "Error: " + err;
+    });
+}
+</script>
+
+</body>
+</html>
