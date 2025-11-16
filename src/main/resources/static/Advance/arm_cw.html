@@ -114,7 +114,7 @@ button:disabled{background-color:#6b7280;}
 ------------------------------------------------------ */
 const userId = localStorage.getItem("current_user_id");
 if (!userId) {
-  window.location.href = "../login.html";
+  window.location.href = "https://pwa-s2rd.onrender.com/login.html";
 }
 const exerciseId = 2; // arm_cw = 2
 
@@ -155,7 +155,7 @@ function angle(a,b,c){
 ------------------------------------------------------ */
 async function saveAccuracy(acc){
   try{
-    await fetch("http://localhost:8080/api/accuracy/save", {
+    await fetch("https://pwa-s2rd.onrender.com/api/accuracy/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -177,7 +177,7 @@ async function loadHistory(){
   historyList.innerHTML = "<li>Loading...</li>";
 
   try{
-    const res = await fetch(`http://localhost:8080/api/accuracy/recent/${userId}/${exerciseId}`);
+    const res = await fetch(`https://pwa-s2rd.onrender.com/api/accuracy/recent/${userId}/${exerciseId}`);
     const list = await res.json();
 
     historyList.innerHTML = "";

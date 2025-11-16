@@ -59,7 +59,7 @@
 function generatePlan(period){
     const category = document.getElementById("categorySelect").value;
 
-    fetch("http://localhost:8080/api/intermediate/generatePlan", {
+    fetch("https://pwa-s2rd.onrender.com/api/intermediate/generatePlan", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({

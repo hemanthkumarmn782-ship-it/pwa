@@ -162,7 +162,7 @@ button:disabled { background-color:#6b7280; cursor:not-allowed; }
 <script>
 /* ---------------- AUTH CHECK ---------------- */
 const currentUserId = localStorage.getItem("current_user_id");
-if (!currentUserId) location.href="../login.html";
+if (!currentUserId) location.href="https://pwa-s2rd.onrender.com/login.html";
 
 const exerciseId = 23;
 
@@ -195,7 +195,7 @@ const targetReps = 5;
 
 /* ------------- LOAD LAST 5 SCORES --------------- */
 async function loadScores() {
-  const res = await fetch(`/api/accuracy/user/${currentUserId}/exercise/${exerciseId}`);
+  const res = await fetch(`https://pwa-s2rd.onrender.com/api/accuracy/user/${currentUserId}/exercise/${exerciseId}`);
   if (!res.ok) return;
 
   const data = await res.json();

@@ -106,7 +106,7 @@ const userId = localStorage.getItem("current_user_id");
 const userName = localStorage.getItem("current_user_name");
 
 if (!userId || !userName) {
-    window.location.href = "../login.html";
+    window.location.href = "https://pwa-s2rd.onrender.com/login.html";
 }
 
 /* ---------------------------
@@ -185,7 +185,7 @@ el.audioToggle.addEventListener('click', ()=>{
    --------------------------- */
 el.exitBtn.onclick = ()=> {
   if (confirm("Exit workout? Progress for this day will be preserved.")){
-    location.href = "../Intermediate/intermediate_home.html";
+    location.href = "https://pwa-s2rd.onrender.com/Intermediate/intermediate_home.html";
   }
 };
 
@@ -535,7 +535,7 @@ async function finishDay(){
   localStorage.setItem("int_done_" + planId, String(dayNum));
 
   // Redirect to intermediate dashboard
-  location.href = "../Intermediate/intermediate_home.html";
+  location.href = "https://pwa-s2rd.onrender.com/Intermediate/intermediate_home.html";
 }
 
 /* ---------------------------

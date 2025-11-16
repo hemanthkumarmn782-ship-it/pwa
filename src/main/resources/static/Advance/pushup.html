@@ -92,14 +92,14 @@ button:disabled{background-color:#6b7280;}
 ------------------------- */
 const currentUserId = localStorage.getItem("current_user_id");
 if (!currentUserId) {
-  window.location.href = "../login.html";
+  window.location.href = "https://pwa-s2rd.onrender.com/login.html";
 }
 const EXERCISE_ID = 4; // pushup
 
 /* LOAD LAST 5 ACCURACY SCORES */
 async function loadLast5() {
   try {
-    const res = await fetch(`/api/accuracy/last5/${currentUserId}/${EXERCISE_ID}`);
+    const res = await fetch(`https://pwa-s2rd.onrender.com/api/accuracy/last5/${currentUserId}/${EXERCISE_ID}`);
     const data = await res.json();
 
     const list = document.getElementById("last5List");

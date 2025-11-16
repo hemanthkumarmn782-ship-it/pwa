@@ -184,7 +184,7 @@ const uid = localStorage.getItem("current_user_id");
 const uname = localStorage.getItem("current_user_name");
 
 if(!uid || !uname){
-  location.href = "../login.html";
+  location.href = "https://pwa-s2rd.onrender.com/login.html";
 }
 
 document.getElementById("usernameDisplay").textContent = uname;
@@ -192,7 +192,7 @@ document.getElementById("usernameDisplay").textContent = uname;
 /* Logout */
 function handleLogout(){
   localStorage.clear();
-  location.href = "../logout.html";
+  location.href = "https://pwa-s2rd.onrender.com/logout.html";
 }
 
 /* ==========================================================
@@ -275,9 +275,9 @@ dropdownMenu.querySelectorAll("button").forEach(btn=>{
     const mode = btn.dataset.mode;
     localStorage.setItem("aw_mode", mode);
 
-    if(mode==="beginner") location.href="../home.html";
-    if(mode==="intermediate") location.href="../Intermediate/intermediate_home.html";
-    if(mode==="advanced") location.href="./advance_home.html";
+    if(mode==="beginner") location.href="https://pwa-s2rd.onrender.com/home.html";
+    if(mode==="intermediate") location.href="https://pwa-s2rd.onrender.com/Intermediate/intermediate_home.html";
+    if(mode==="advanced") location.href="https://pwa-s2rd.onrender.com/advance_home.html";
   };
 });
 </script>

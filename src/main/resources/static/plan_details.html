@@ -41,7 +41,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const planId = urlParams.get("planId");
 
 function loadPlanDetails(){
-    fetch("http://localhost:8080/api/intermediate/getPlanDetails/" + planId)
+    fetch("https://pwa-s2rd.onrender.com/api/intermediate/getPlanDetails/" + planId)
     .then(res => res.json())
     .then(result => {
 
