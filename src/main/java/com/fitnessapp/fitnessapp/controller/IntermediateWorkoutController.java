@@ -16,7 +16,7 @@ import java.util.*;
  */
 @RestController
 @RequestMapping("/api/intermediate")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://pwa-s2rd.onrender.com")
 public class IntermediateWorkoutController {
 
     private final IntermediateWorkoutService service;

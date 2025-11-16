@@ -16,7 +16,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/accuracy")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://pwa-s2rd.onrender.com")
+
 public class AccuracyController {
 
     @Autowired

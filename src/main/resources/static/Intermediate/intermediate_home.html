@@ -473,6 +473,7 @@ async function createPlan(){
     type: type,
     name: finalName
   };
+  console.log("generate-plan body:", body);
 
   const res = await fetch("https://pwa-s2rd.onrender.com/api/intermediate/generate-plan", {
     method:"POST",

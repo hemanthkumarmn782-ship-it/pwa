@@ -8,7 +8,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/weekly-progress")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://pwa-s2rd.onrender.com")
 public class WeeklyProgressController {
 
     @Autowired

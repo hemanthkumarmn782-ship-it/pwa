@@ -12,7 +12,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/workout-plan-exercises")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "https://pwa-s2rd.onrender.com")
 public class WorkoutPlanExerciseController {
 
     @Autowired

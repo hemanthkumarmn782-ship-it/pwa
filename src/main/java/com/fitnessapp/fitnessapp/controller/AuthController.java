@@ -10,7 +10,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")  
+@CrossOrigin(origins = "https://pwa-s2rd.onrender.com")
 public class AuthController {
 
     @Autowired
